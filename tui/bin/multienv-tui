@@ -1,0 +1,386 @@
+#!/usr/bin/env bash
+
+ensure_bash() {
+    (( BASH_VERSINFO[0] >= 4 )) && return
+    local candidate
+    for candidate in /opt/homebrew/bin/bash /usr/local/bin/bash; do
+        [[ -x "$candidate" ]] && exec "$candidate" "$0" "$@"
+    done
+    printf 'multienv-tui requires Bash 4 or newer\n' >&2
+    exit 1
+}
+
+ensure_bash "$@"
+set -o pipefail
+
+script_dir="$(cd "$(dirname "$(realpath "${BASH_SOURCE[0]}")")" && pwd)"
+source "${script_dir}/../lib/prelude.sh"
+source "${script_dir}/../lib/select.sh"
+
+printf -v self_command '%q %q' "$BASH" "${script_dir}/multienv-tui"
+printf -v child_shell '%q -c' "$BASH"
+log_file=/tmp/multienv-tui-last-run.log
+sync_pid=''
+
+ui_host_alias() {
+    local host="${1:?need hostname}"
+    local colors=(36 33 35 32 34 31)
+    local i checksum
+    for i in "${!c_hostnames[@]}"; do
+        [[ "${c_hostnames[$i]}" == "$host" ]] || continue
+        printf '\033[%sm%s\033[0m' "${colors[i % ${#colors[@]}]}" \
+            "${c_hostname_to_host_alias[$host]:-$host}"
+        return
+    done
+    read -r checksum _ < <(printf '%s' "$host" | cksum)
+    printf '\033[%sm%s\033[0m' "${colors[checksum % ${#colors[@]}]}" "$host"
+}
+
+host_aliases() {
+    local host
+    while IFS= read -r host; do
+        jq -cn --arg host "$host" --arg alias "$(ui_host_alias "$host")" \
+            '{key: $host, value: $alias}'
+    done | jq -s 'from_entries'
+}
+
+show_error() {
+    local message="${1:?need message}"
+    printf '%s (see %s)\n' "$message" "$log_file" >&2
+    tmux display-message -d 5000 "$message (see $log_file)" 2>>"$log_file" || true
+}
+
+archived_visible() {
+    [[ -n "${MULTIENV_TUI_STATE_DIR:-}" ]] &&
+        [[ -f "${MULTIENV_TUI_STATE_DIR}/archived" ]]
+}
+
+toggle_archived() {
+    if archived_visible; then
+        rm -f "${MULTIENV_TUI_STATE_DIR}/archived"
+    else
+        touch "${MULTIENV_TUI_STATE_DIR:?need UI state}/archived"
+    fi
+}
+
+ui_jq_helpers() {
+    cat <<'JQ'
+        def text: tostring | gsub("[\u0000-\u001f\u007f-\u009f]"; " ");
+        def colored_state:
+            (.state // "Unknown" | text) as $state |
+            ({Working: 36, Idle: 32, Approval: 33, Input: 33,
+              Archived: 33, Error: 31}[$state] // 2) as $color |
+            "\u001b[\($color)m\($state)\u001b[0m";
+JQ
+}
+
+list_options() {
+    local mode="${1:?need mode}" host_filter="${2:-}"
+    local sessions aliases show_archived=false
+    sessions="$("${mode}-agent" list-all 2>>"$log_file")" || return
+    aliases="$(jq -r 'keys[]' <<<"$sessions" | host_aliases)" || return
+    archived_visible && show_archived=true
+
+    jq -r --arg mode "$mode" --arg host_filter "$host_filter" \
+        --argjson aliases "$aliases" --argjson show_archived "$show_archived" \
+        "$(ui_jq_helpers)"'
+        to_entries[] | .key as $host |
+        select($host_filter == "" or $host == $host_filter) |
+        .value | to_entries[] |
+        .value + {hostname: $host, id: .key} |
+        select($mode == "tmux" or $show_archived or .state != "Archived") |
+        . as $session |
+        (if $mode == "tmux" then .name else .title end) as $title |
+        (if ($title // "") == "" then .id else $title end | text) as $label |
+        (if $mode == "tmux" then
+            [$label, $aliases[$host], "\(.window_count) windows"]
+         else
+            [colored_state, $aliases[$host], $label]
+         end) + [$host, .id, ($session | tojson | @base64)] | @tsv
+    ' <<<"$sessions"
+}
+
+decode_session() {
+    jq -Rer '@base64d | fromjson' <<<"${1:?need session}"
+}
+
+preview_session() {
+    local session host
+    session="$(decode_session "${1:-}")" || return
+    host="$(jq -r '.hostname' <<<"$session")"
+    printf 'Host: %s\n\n' "$(ui_host_alias "$host")"
+    jq -r "$(ui_jq_helpers)"'
+        "Title: \((.title // .id) | text)", "",
+        "State: \(colored_state)",
+        "Directory: \((.work_dir // "") | text)", "",
+        "Session: \(.id | text)",
+        "Pane: \((if (.tmux_pane_id // "") == "" then "—"
+                  else .tmux_pane_id end) | text)",
+        "Synced: \((.synced_at // "—") | text)"
+    ' <<<"$session"
+}
+
+ui_header() {
+    local mode="${1:?need mode}" archives=hidden
+    if [[ "$mode" == tmux ]]; then
+        printf 'TMUX · ctrl-b Codex\nEnter switch · Tab select\n'
+        printf 'ctrl-n new · ctrl-r rename · ctrl-x kill\n'
+    else
+        archived_visible && archives=shown
+        printf 'CODEX · archives %s · ctrl-b tmux\n' "$archives"
+        printf 'Enter switch/resume · Tab select\n'
+        printf 'ctrl-a archive · ctrl-u unarchive\nctrl-x delete · ctrl-g archived\n'
+    fi
+}
+
+session_action() {
+    local mode="${1:?need mode}" action="${2:?need action}"
+    shift 2
+    local encoded session status=0
+    for encoded in "$@"; do
+        [[ -n "$encoded" ]] || continue
+        session="$(decode_session "$encoded")" || return
+        if ! jq '{hostname, session_id: .id}' <<<"$session" |
+            "${mode}-agent" "$action" >>"$log_file" 2>&1; then
+            show_error "Failed: $action"
+            status=1
+        fi
+    done
+    return "$status"
+}
+
+rename_session() {
+    local session name
+    session="$(decode_session "${1:?need session}")" || return
+    IFS= read -r -p 'New session name: ' name </dev/tty || return
+    [[ -n "$name" ]] || return 0
+    jq --arg name "$name" '{hostname, session_id: .id, new_name: $name}' <<<"$session" |
+        tmux-agent rename-session >>"$log_file" 2>&1 || show_error 'Rename failed'
+}
+
+query_string() {
+    local prompt="${1:?need prompt}" response_file popup_command
+    response_file="$(mktemp "${MULTIENV_TUI_STATE_DIR}/response.XXXXXX")" || return
+    printf -v popup_command 'printf %%s %q; IFS= read -r response; ' "$prompt: "
+    printf -v popup_command '%sprintf "%%s\\n" "$response" > %q' \
+        "$popup_command" "$response_file"
+    tmux display-popup -E "$popup_command" || return
+    cat "$response_file"
+    rm -f "$response_file"
+}
+
+create_session() {
+    local hosts aliases selected host name
+    hosts="$(tmux-agent list-all 2>>"$log_file" | jq -r 'keys[]')" || return
+    hosts="$(printf '%s\n' "$hosts" "${c_hostnames[@]}" | sed '/^$/d' | sort -u)"
+    aliases="$(host_aliases <<<"$hosts")" || return
+    selected="$(jq -r 'to_entries[] | [.value, .key] | @tsv' <<<"$aliases" |
+        fzf --tmux --ansi --select-1 --no-multi --no-expect \
+            --delimiter=$'\t' --with-nth=1 --accept-nth=2 --prompt='Choose host ❯ ' \
+            --preview-window=hidden)" || return 0
+    [[ -n "$selected" ]] || return 0
+    host="$selected"
+    name="$(query_string 'Session name')" || return
+    [[ -n "$name" ]] || return 0
+    jq -n --arg host "$host" --arg name "$name" '{hostname: $host, name: $name}' |
+        tmux-agent new-session >>"$log_file" 2>&1 || show_error 'Create failed'
+}
+
+select_pane() {
+    local host="${1:?need hostname}" pane="${2:?need pane id}"
+    select_session "$host" "$pane"
+}
+
+create_codex_pane() {
+    local host="${1:?need host}" id="${2:?need session id}"
+    local options selected session_id result
+    options="$(list_options tmux "$host")" || return
+    if [[ -z "$options" ]]; then
+        show_error 'Create a tmux session on this host first'
+        return 1
+    fi
+    selected="$(fzf --tmux --ansi --select-1 --no-multi --no-expect \
+        --delimiter=$'\t' --with-nth=1,2,3 --accept-nth=6 \
+        --prompt='Resume in tmux session ❯ ' --preview-window=hidden <<<"$options")" || return
+    [[ -n "$selected" ]] || return 1
+    session_id="$(decode_session "$selected" | jq -r '.id')" || return
+    result="$(jq -n --arg host "$host" --arg session "$session_id" \
+        --arg name "codex-${id:0:8}" \
+        '{hostname: $host, session_id: $session, name: $name}' |
+        tmux-agent new-window 2>>"$log_file")" || {
+        show_error 'Failed to create a tmux window'
+        return 1
+    }
+    jq -er '.tmux_pane_id | select(type == "string" and test("^%[0-9]+$"))' \
+        <<<"$result" || {
+        show_error 'New window response has no pane ID'
+        return 1
+    }
+}
+
+open_codex_session() {
+    local encoded="${1:?need session}" session host id pane
+    session="$(decode_session "$encoded")" || return
+    host="$(jq -r '.hostname' <<<"$session")"
+    id="$(jq -r '.id' <<<"$session")"
+    # Refresh before resuming so a stale picker row does not launch another process.
+    session="$(codex-agent list-all 2>>"$log_file" |
+        jq -e --arg host "$host" --arg id "$id" '.[$host][$id]')" || {
+        show_error 'Codex session no longer available'
+        return 1
+    }
+    pane="$(jq -r '.tmux_pane_id // empty' <<<"$session")"
+    if [[ -z "$pane" ]]; then
+        pane="$(create_codex_pane "$host" "$id")" || return
+        if ! jq -n --arg host "$host" --arg id "$id" --arg pane "$pane" \
+            '{hostname: $host, session_id: $id, tmux_pane_id: $pane}' |
+            codex-agent resume-session >>"$log_file" 2>&1; then
+            show_error 'Resume failed'
+            return 1
+        fi
+    fi
+    select_pane "$host" "$pane"
+}
+
+picker_bindings() {
+    local mode="${1:?need mode}" bindings
+    bindings='start:hide-header,?:toggle-header'
+    bindings+=',enter:clear-multi+accept,double-click:clear-multi+accept'
+    if [[ "$mode" == tmux ]]; then
+        bindings+=",ctrl-x:execute-silent($self_command --action tmux kill-session {+6})"
+        bindings+="+reload-sync($self_command --list tmux)+clear-multi"
+        bindings+=",ctrl-r:execute($self_command --rename {6})"
+        bindings+="+reload-sync($self_command --list tmux)+clear-multi"
+    else
+        local key action
+        for key in ctrl-a ctrl-u ctrl-x; do
+            case "$key" in
+                ctrl-a) action=archive-session ;;
+                ctrl-u) action=unarchive-session ;;
+                ctrl-x) action=delete-session ;;
+            esac
+            bindings+=",$key:execute-silent($self_command --action codex $action {+6})"
+            bindings+="+reload-sync($self_command --list codex)+clear-multi"
+        done
+        bindings+=",ctrl-g:execute-silent($self_command --toggle-archived)"
+        bindings+="+transform-header($self_command --header codex)"
+        bindings+="+reload-sync($self_command --list codex)+clear-multi"
+    fi
+    printf '%s\n' "$bindings"
+}
+
+run_picker() {
+    local mode="${1:?need mode}" query="${2:-}" options keys=ctrl-b
+    local popup=--tmux args=()
+    options="$(list_options "$mode")" || return
+    if [[ "$mode" == tmux ]]; then
+        keys+=,ctrl-n
+        args+=(--preview-window=hidden)
+    else
+        popup=--tmux=center,90%,90%
+        args+=(--layout=reverse)
+        args+=(--preview="$self_command --preview {6}")
+        args+=(--preview-window='right,50%,border-left,wrap')
+    fi
+    fzf "$popup" --ansi --multi --no-select-1 --no-expect --expect="$keys" \
+        --prompt='❯ ' --delimiter=$'\t' --with-nth=1,2,3 --nth=1,2,3 \
+        --track --id-nth=4,5 --print-query --query="$query" \
+        --header="$(ui_header "$mode")" --with-shell="$child_shell" \
+        --bind="$(picker_bindings "$mode")" \
+        --bind="every(2):reload-sync($self_command --list $mode)" \
+        "${args[@]}" <<<"$options"
+}
+
+sync_agents() {
+    local tmux_pid='' codex_pid='' sleep_pid=''
+    trap 'kill "$tmux_pid" "$codex_pid" "$sleep_pid" 2>/dev/null; exit 0' INT TERM
+    while true; do
+        tmux-agent sync-all >>"$log_file" 2>&1 &
+        tmux_pid=$!
+        codex-agent sync-all >>"$log_file" 2>&1 &
+        codex_pid=$!
+        wait "$tmux_pid" "$codex_pid"
+        tmux_pid='' codex_pid=''
+        sleep 2 &
+        sleep_pid=$!
+        wait "$sleep_pid"
+        sleep_pid=''
+    done
+}
+
+cleanup() {
+    if [[ -n "$sync_pid" ]]; then
+        kill "$sync_pid" 2>/dev/null || true
+        wait "$sync_pid" 2>/dev/null || true
+    fi
+    [[ -z "${MULTIENV_TUI_STATE_DIR:-}" ]] || rm -rf "$MULTIENV_TUI_STATE_DIR"
+}
+
+main() {
+    local mode="${1:-tmux}" selected query key rows encoded status command
+    local -A queries=([tmux]='' [codex]='')
+    is_in_tmux || die 'Run multienv-tui inside tmux'
+    for command in fzf jq tmux-agent codex-agent; do
+        command -v "$command" >/dev/null || die "Missing command: $command"
+    done
+    MULTIENV_TUI_STATE_DIR="$(mktemp -d "${TMPDIR:-/tmp}/multienv-tui.XXXXXX")" || return
+    export MULTIENV_TUI_STATE_DIR
+    trap cleanup EXIT
+    trap 'exit 130' INT
+    trap 'exit 143' TERM
+    sync_agents &
+    sync_pid=$!
+
+    while true; do
+        selected="$(run_picker "$mode" "${queries[$mode]}")"
+        status=$?
+        (( status == 130 )) && return 0
+        if (( status != 0 )) && [[ -z "$selected" ]]; then
+            return "$status"
+        fi
+        query="${selected%%$'\n'*}"
+        rows="${selected#*$'\n'}"
+        key="${rows%%$'\n'*}"
+        rows="${rows#*$'\n'}"
+        queries[$mode]="$query"
+        case "$key" in
+            ctrl-b)
+                if [[ "$mode" == tmux ]]; then mode=codex; else mode=tmux; fi
+                ;;
+            ctrl-n) create_session ;;
+            '')
+                [[ "$rows" == *$'\t'* ]] || continue
+                encoded="$(cut -f6 <<<"${rows%%$'\n'*}")"
+                if [[ "$mode" == codex ]]; then
+                    open_codex_session "$encoded" && return 0
+                else
+                    selected="$(decode_session "$encoded")" || return
+                    select_session "$(jq -r '.hostname' <<<"$selected")" \
+                        "$(jq -r '.id' <<<"$selected")" && return 0
+                fi
+                ;;
+            *) return 0 ;;
+        esac
+    done
+}
+
+dispatch() {
+    case "${1:-tmux}" in
+        --list) list_options "${2:?need mode}" "${3:-}" ;;
+        --preview) [[ -z "${2:-}" ]] || preview_session "$2" ;;
+        --header) ui_header "${2:?need mode}" ;;
+        --toggle-archived) toggle_archived ;;
+        --action) shift; session_action "$@" ;;
+        --rename) [[ -z "${2:-}" ]] || rename_session "$2" ;;
+        tmux|codex) main "${1:-tmux}" ;;
+        --help|-h)
+            printf 'Usage: multienv-tui [tmux|codex]\n\n'
+            ui_header tmux
+            printf '\n'
+            ui_header codex
+            ;;
+        *) printf 'Unknown option: %s\n' "$1" >&2; return 2 ;;
+    esac
+}
+
+dispatch "$@"

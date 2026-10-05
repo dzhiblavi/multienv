@@ -1,0 +1,42 @@
+#!/usr/bin/env bash
+
+root="$(dirname $(realpath ${BASH_SOURCE}))/.."
+source "${root}/lib/prelude.sh"
+
+_tmux_attach() {
+    local hostname="${1:?need hostname}"
+    local session_id="${2:?need session_id}"
+
+    if is_on_hostname "${hostname}"; then
+        tmux attach -t "${session_id}"
+    else
+        log "attaching to remote session ${hostname}:${session_id}"
+        run_remote_interactive "${hostname}" tmux attach -t "${session_id}"
+    fi
+}
+
+tmux_attach() {
+    _tmux_attach "$@" </dev/tty <&1
+}
+
+listen() {
+    local ctrl_port="${c_ctrl_port:?need control port}"
+    log "endpoint=localhost:${ctrl_port}"
+
+    while read -r line; do
+        read -r hostname session_id <<<"${line}"
+
+        log "received ${hostname}, ${session_id}"
+        tmux_attach "${hostname}" "${session_id}" &
+        log "dispatch done, listening"
+    done < <(nc -kl 127.0.0.1 "${ctrl_port}")
+}
+
+initial_session="${1:?need initial session}"
+initial_host="${2:-$(hostname)}"
+
+# Start interactive session immediately in background
+tmux_attach "${initial_host}" "${initial_session}" &
+
+# Run server
+listen

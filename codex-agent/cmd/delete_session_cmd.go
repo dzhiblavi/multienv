@@ -1,0 +1,28 @@
+package main
+
+import (
+	"encoding/json"
+	"fmt"
+
+	"github.com/spf13/cobra"
+
+	"multienv/codex-agent/internal/agent"
+)
+
+func newDeleteSessionCmd(app *App) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "delete-session",
+		Short: "delete session in the workspace",
+		Args:  cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			var params agent.DeleteSessionParams
+			if err := json.NewDecoder(cmd.InOrStdin()).Decode(&params); err != nil {
+				return fmt.Errorf("failed to decode request: %v", err)
+			}
+
+			return app.Agent.DeleteSession(cmd.Context(), params)
+		},
+	}
+
+	return cmd
+}

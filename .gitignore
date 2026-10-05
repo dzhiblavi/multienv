@@ -1,0 +1,49 @@
+# Build artifacts and local Go workspace
+/bin/
+/build/
+/dist/
+/cmd
+/multienv-server
+*.exe
+*.test
+/go.work
+/go.work.sum
+
+# Coverage and profiling
+/coverage/
+coverage.out
+coverage.html
+coverage.xml
+*.prof
+
+# Local configuration and credentials
+.env
+.env.*
+!.env.example
+!.env.sample
+!.env.*.example
+*.local.yaml
+*.local.yml
+*.local.json
+credentials.yaml
+credentials.yml
+*-credentials.yaml
+*-credentials.yml
+
+# Runtime and temporary files
+/.cache/
+/tmp/
+*.log
+*.pid
+*.pid.lock
+*.sock
+*.tmp
+*.swp
+*.swo
+*~
+
+# Editor and macOS metadata
+.idea/
+.vscode/
+.DS_Store
+._*

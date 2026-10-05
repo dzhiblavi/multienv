@@ -1,0 +1,14 @@
+services:
+  redis:
+    image: redis:8.2-alpine
+    command: ["redis-server", "/etc/redis/redis.conf"]
+    ports:
+      - "127.0.0.1:6379:6379"
+    volumes:
+      - ./redis.conf:/etc/redis/redis.conf:ro
+      - ./users.acl:/etc/redis/users.acl:ro
+      - redis-data:/data
+    restart: unless-stopped
+
+volumes:
+  redis-data:
