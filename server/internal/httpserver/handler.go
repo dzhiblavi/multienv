@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
-	"log"
 	"net/http"
 
 	"multienv/server/internal/dispatcher"
@@ -12,10 +11,12 @@ import (
 
 type handlerFunc func(http.ResponseWriter, *http.Request)
 
-func makeHandler(disp dispatcher.Dispatcher) handlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
+func makeHandler(disp dispatcher.Dispatcher) http.HandlerFunc {
+	handler := func(w http.ResponseWriter, r *http.Request) {
 		handler(disp, w, r)
 	}
+
+	return AccessLogMiddleware()(handler)
 }
 
 func handler(
@@ -23,26 +24,25 @@ func handler(
 	w http.ResponseWriter,
 	r *http.Request,
 ) {
+	ctx := r.Context()
+
 	w.Header().Set("Content-Type", "application/json")
 	defer r.Body.Close()
 
 	bodyBytes, err := io.ReadAll(r.Body)
 	if err != nil {
-		log.Printf("request body read failed")
 		w.WriteHeader(http.StatusInternalServerError)
 		json.NewEncoder(w).Encode(dispatcher.Response{Error: err})
 		return
 	}
 
-	resp, err := disp.Dispatch(r.Context(), string(bodyBytes))
+	resp, err := disp.Dispatch(ctx, string(bodyBytes))
 	if err != nil {
-		log.Printf("server dispatch error: %v", err)
 		w.WriteHeader(httpCodeForError(err))
 		json.NewEncoder(w).Encode(dispatcher.Response{Error: err})
 		return
 	}
 
-	log.Printf("request OK")
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(resp)
 }

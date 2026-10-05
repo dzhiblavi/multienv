@@ -3,11 +3,11 @@ package agent
 import (
 	"context"
 	"fmt"
-	"log"
 
 	"multienv/codex-agent/internal/codex"
 	"multienv/common/codex/model"
 	"multienv/common/codex/operations"
+	"multienv/common/log"
 )
 
 func (a Agent) ListAll(ctx context.Context) (model.SessionsByHost, error) {
@@ -15,7 +15,7 @@ func (a Agent) ListAll(ctx context.Context) (model.SessionsByHost, error) {
 
 	response, err := a.client.ListAll(ctx, operations.ListAllRequest{})
 	if err != nil {
-		log.Printf("failed to get all sessions: %v, ignoring", err)
+		log.Warn(ctx, "failed to get all sessions; using local sessions", "error", err)
 	} else {
 		sessions = response.Sessions
 	}

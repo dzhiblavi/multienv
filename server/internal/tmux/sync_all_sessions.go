@@ -2,9 +2,9 @@ package tmux
 
 import (
 	"context"
-	"log"
 	"sync"
 
+	"multienv/common/log"
 	"multienv/common/tmux/operations"
 )
 
@@ -18,7 +18,7 @@ func (s Dispatcher) SyncAllSessions(
 		wg.Add(1)
 
 		go func(host string) {
-			log.Printf("syncing host %s", host)
+			log.Info(ctx, "syncing host", "dispatcher", "tmux", "host", host)
 
 			req := operations.ForwardAgentRequest{
 				Hostname: host,
@@ -27,7 +27,8 @@ func (s Dispatcher) SyncAllSessions(
 
 			_, err := s.ForwardAgent(ctx, req)
 			if err != nil {
-				log.Printf("failed to sync host %s: %v", host, err)
+				log.Error(ctx, "failed to sync host", "dispatcher", "tmux",
+					"host", host, "error", err)
 			}
 
 			wg.Done()

@@ -33,8 +33,10 @@ func newRootCmd() *cobra.Command {
 	app := App{}
 
 	cmd := &cobra.Command{
-		Use:   "tmux-agent",
-		Short: "execute tmux commands across connected workspace",
+		Use:           "tmux-agent",
+		Short:         "execute tmux commands across connected workspace",
+		SilenceErrors: true,
+		SilenceUsage:  true,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			defer app.Close()
 			return app.server.Serve(cmd.Context())

@@ -4,8 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
 
+	"multienv/common/log"
 	"multienv/common/tmux/operations"
 	"multienv/server/internal/dispatcher"
 	"multienv/server/internal/storage"
@@ -26,7 +26,8 @@ func (s Dispatcher) Dispatch(ctx context.Context, payload string) (any, error) {
 		return "", err
 	}
 
-	log.Printf("action: %s, full payload: %s", env.Action, payload)
+	log.Info(ctx, "dispatch", "dispatcher", "tmux", "action", env.Action)
+	log.AddCustomLogData(ctx, "action", env.Action)
 
 	switch env.Action {
 	case "list-all":

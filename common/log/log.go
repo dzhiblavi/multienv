@@ -1,0 +1,18 @@
+package log
+
+import (
+	"context"
+	"log/slog"
+)
+
+func Info(ctx context.Context, msg string, args ...any) {
+	slog.InfoContext(ctx, msg, args...)
+}
+
+func Warn(ctx context.Context, msg string, args ...any) {
+	slog.WarnContext(ctx, msg, args...)
+}
+
+func Error(ctx context.Context, msg string, args ...any) {
+	slog.ErrorContext(ctx, msg, args...)
+}

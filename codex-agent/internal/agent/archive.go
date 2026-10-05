@@ -3,11 +3,11 @@ package agent
 import (
 	"context"
 	"fmt"
-	"log"
 
 	"multienv/codex-agent/internal/codex"
 	"multienv/codex-agent/internal/tmux"
 	"multienv/common/codex/operations"
+	"multienv/common/log"
 )
 
 type ArchiveSessionParams struct {
@@ -32,7 +32,8 @@ func (a Agent) archiveLocalSession(ctx context.Context, id string) error {
 	tmuxPane, ok := mapping[id]
 	if ok {
 		if err = tmux.KillPane(ctx, tmuxPane); err != nil {
-			log.Printf("failed to kill tmux pane with the session: %v", err)
+			log.Warn(ctx, "failed to kill tmux pane with the session",
+				"session_id", id, "pane_id", tmuxPane, "error", err)
 		}
 	}
 

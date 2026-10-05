@@ -9,9 +9,16 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"time"
 )
 
-func Run(ctx context.Context, command Command) (RunResult, error) {
+func Run(ctx context.Context, command Command) (result RunResult, runErr error) {
+	start := time.Now()
+	logCommand(ctx, command)
+	defer func() {
+		logCommandResult(ctx, command, result, runErr, time.Since(start))
+	}()
+
 	name, err := expandCommandName(command.Name)
 	if err != nil {
 		return RunResult{}, fmt.Errorf("expand command path: %w", err)

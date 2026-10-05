@@ -6,13 +6,13 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"log"
 	"os"
 	"regexp"
 	"strings"
 	"time"
 
 	"multienv/common/codex/model"
+	"multienv/common/log"
 	"multienv/common/subprocess"
 	"multienv/common/util"
 )
@@ -167,7 +167,8 @@ func getAllCodexSessions(ctx context.Context) (model.SessionsById, error) {
 		} else {
 			state, err := getCodexSessionState(ctx, threadsDB, info.sessionId)
 			if err != nil {
-				log.Printf("get active Codex session state: %v", err)
+				log.Warn(ctx, "failed to get active Codex session state",
+					"session_id", info.sessionId, "pane_id", pane.Id, "error", err)
 				state = model.Unknown
 			}
 

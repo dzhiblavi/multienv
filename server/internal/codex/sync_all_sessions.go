@@ -2,10 +2,10 @@ package codex
 
 import (
 	"context"
-	"log"
 	"sync"
 
 	"multienv/common/codex/operations"
+	"multienv/common/log"
 )
 
 func (s Dispatcher) SyncAllSessions(
@@ -18,7 +18,7 @@ func (s Dispatcher) SyncAllSessions(
 		wg.Add(1)
 
 		go func(host string) {
-			log.Printf("syncing host %s", host)
+			log.Info(ctx, "syncing host", "dispatcher", "codex", "host", host)
 
 			req := operations.ForwardAgentRequest{
 				Hostname: host,
@@ -27,7 +27,8 @@ func (s Dispatcher) SyncAllSessions(
 
 			_, err := s.ForwardAgent(ctx, req)
 			if err != nil {
-				log.Printf("failed to sync host %s: %v", host, err)
+				log.Error(ctx, "failed to sync host", "dispatcher", "codex",
+					"host", host, "error", err)
 			}
 
 			wg.Done()
