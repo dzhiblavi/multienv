@@ -54,6 +54,6 @@ func newRootCmd() *cobra.Command {
 	cmd.AddCommand(newDeleteSessionCmd(&app))
 	cmd.AddCommand(newArchiveSessionCmd(&app))
 	cmd.AddCommand(newUnarchiveSessionCmd(&app))
-	cmd.AddCommand(newResumeSessionCmd(&app))
+	cmd.AddCommand(newPrepareResumeCmd(&app))
 	return cmd
 }

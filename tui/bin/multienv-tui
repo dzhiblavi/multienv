@@ -213,8 +213,11 @@ select_pane() {
 }
 
 create_codex_pane() {
-    local host="${1:?need host}" id="${2:?need session id}"
+    local session="${1:?need session}" host id work_dir
     local options selected session_id result
+    host="$(jq -r '.hostname' <<<"$session")"
+    id="$(jq -r '.id' <<<"$session")"
+    work_dir="$(jq -r '.work_dir' <<<"$session")"
     options="$(list_options tmux "$host")" || return
     if [[ -z "$options" ]]; then
         show_error 'Create a tmux session on this host first'
@@ -226,8 +229,9 @@ create_codex_pane() {
     [[ -n "$selected" ]] || return 1
     session_id="$(decode_session "$selected" | jq -r '.id')" || return
     result="$(jq -n --arg host "$host" --arg session "$session_id" \
-        --arg name "codex-${id:0:8}" \
-        '{hostname: $host, session_id: $session, name: $name}' |
+        --arg name "codex-${id:0:8}" --arg dir "$work_dir" --arg id "$id" \
+        '{hostname: $host, session_id: $session, name: $name, work_dir: $dir,
+          command: ["multienv-tui", "--resume-when-visible", $id]}' |
         tmux-agent new-window 2>>"$log_file")" || {
         show_error 'Failed to create a tmux window'
         return 1
@@ -239,29 +243,45 @@ create_codex_pane() {
     }
 }
 
-resume_codex_here() {
-    local session="${1:?need session}" id work_dir
+exec_codex() {
+    local id="${1:?need session id}" work_dir="${2:-}"
     local args=(--no-daemon)
     command -v codex >/dev/null || { show_error 'Missing command: codex'; return 1; }
-    id="$(jq -r '.id' <<<"$session")"
-    work_dir="$(jq -r '.work_dir // empty' <<<"$session")"
     if [[ -n "$work_dir" ]]; then
         [[ -d "$work_dir" ]] || { show_error 'Session directory not found'; return 1; }
         args+=(--cd "$work_dir")
     fi
     args+=(resume "$id")
-    if [[ "$(jq -r '.state' <<<"$session")" == Archived ]]; then
-        if ! jq '{hostname, session_id: .id}' <<<"$session" |
-            codex-agent unarchive-session >>"$log_file" 2>&1; then
-            show_error 'Unarchive failed'
-            return 1
-        fi
-    fi
     # Stop the dashboard before replacing it; Codex owns this pane and its terminal.
     cleanup
     trap - EXIT INT TERM
     # Preserve the pane's TTY descriptors; /dev/tty cannot be polled by kqueue on macOS.
     exec codex "${args[@]}"
+}
+
+wait_for_visible_pane() {
+    local pane="${1:?need pane id}" timeout="${2:-60}" deadline state
+    deadline=$((SECONDS + timeout))
+    while (( SECONDS < deadline )); do
+        state="$(tmux display-message -p -t "$pane" \
+            '#{pane_active}:#{window_active}:#{session_attached}' 2>>"$log_file")" || {
+            show_error 'Cannot check Codex pane visibility'
+            return 1
+        }
+        [[ "$state" =~ ^1:1:[1-9][0-9]*$ ]] && return 0
+        sleep 0.1
+    done
+    show_error "No client switched to the Codex pane within $timeout seconds"
+    return 1
+}
+
+resume_when_visible() {
+    local id="${1:?need session id}"
+    is_in_tmux || die 'Run the Codex launcher inside tmux'
+    trap 'exit 130' INT
+    trap 'exit 143' TERM
+    wait_for_visible_pane "${TMUX_PANE:?need pane id}" || return
+    exec_codex "$id"
 }
 
 open_codex_session() {
@@ -277,17 +297,17 @@ open_codex_session() {
     }
     pane="$(jq -r '.tmux_pane_id // empty' <<<"$session")"
     if [[ -z "$pane" ]]; then
+        session="$(jq -n --arg host "$host" --arg id "$id" \
+            '{hostname: $host, session_id: $id}' |
+            codex-agent prepare-resume 2>>"$log_file")" || {
+            show_error 'Prepare resume failed'
+            return 1
+        }
         if ! popup_enabled && is_on_hostname "$host"; then
-            resume_codex_here "$session"
+            exec_codex "$id" "$(jq -r '.work_dir' <<<"$session")"
             return
         fi
-        pane="$(create_codex_pane "$host" "$id")" || return
-        if ! jq -n --arg host "$host" --arg id "$id" --arg pane "$pane" \
-            '{hostname: $host, session_id: $id, tmux_pane_id: $pane}' |
-            codex-agent resume-session >>"$log_file" 2>&1; then
-            show_error 'Resume failed'
-            return 1
-        fi
+        pane="$(create_codex_pane "$session")" || return
     fi
     select_pane "$host" "$pane"
 }
@@ -445,6 +465,7 @@ dispatch() {
         --toggle-archived) toggle_archived ;;
         --action) shift; session_action "$@" ;;
         --rename) [[ -z "${2:-}" ]] || rename_session "$2" ;;
+        --resume-when-visible) resume_when_visible "${2:?need session id}" ;;
         tmux|codex|--no-popup|--help|-h|'') start_ui "$@" ;;
         *) printf 'Unknown option: %s\n' "$1" >&2; return 2 ;;
     esac
