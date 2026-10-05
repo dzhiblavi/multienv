@@ -68,7 +68,7 @@ ui_jq_helpers() {
         def text: tostring | gsub("[\u0000-\u001f\u007f-\u009f]"; " ");
         def colored_state:
             (.state // "Unknown" | text) as $state |
-            ({Working: 36, Idle: 32, Approval: 33, Input: 33,
+            ({Working: 36, Idle: 32, ActionRequired: "1;91", Approval: 33, Input: 33,
               Archived: 33, Error: 31}[$state] // 2) as $color |
             "\u001b[\($color)m\($state)\u001b[0m";
 JQ
@@ -110,13 +110,18 @@ preview_session() {
     host="$(jq -r '.hostname' <<<"$session")"
     printf 'Host: %s\n\n' "$(ui_host_alias "$host")"
     jq -r "$(ui_jq_helpers)"'
+        def message:
+            if . == "" then "—"
+            else gsub("[\u0000-\u0009\u000b-\u001f\u007f-\u009f]"; " ") end;
         "Title: \((.title // .id) | text)", "",
         "State: \(colored_state)",
         "Directory: \((.work_dir // "") | text)", "",
         "Session: \(.id | text)",
         "Pane: \((if (.tmux_pane_id // "") == "" then "—"
                   else .tmux_pane_id end) | text)",
-        "Synced: \((.synced_at // "—") | text)"
+        "Synced: \((.synced_at // "—") | text)", "",
+        "First message:", (.first_message // "" | message), "",
+        "Last message:", (.last_message // "" | message)
     ' <<<"$session"
 }
 

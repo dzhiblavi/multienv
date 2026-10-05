@@ -6,6 +6,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"log"
 	"os"
 	"regexp"
 	"strings"
@@ -17,8 +18,9 @@ import (
 )
 
 type tmuxPane struct {
-	Id  string `json:"id"`
-	Tty string `json:"tty"`
+	Id    string `json:"id"`
+	Tty   string `json:"tty"`
+	Title string `json:"title"`
 }
 
 type codexFilesInfo struct {
@@ -50,8 +52,8 @@ func GetSessionToTmuxPaneMapping(ctx context.Context) (map[string]string, error)
 	}
 
 	for _, info := range filesInfo {
-		if paneId, ok := paneByTty[info.tty]; ok {
-			result[info.sessionId] = paneId
+		if pane, ok := paneByTty[info.tty]; ok {
+			result[info.sessionId] = pane.Id
 		}
 	}
 
@@ -75,6 +77,7 @@ func getAllCodexSessions(ctx context.Context) (model.SessionsById, error) {
 		defer db.Close()
 		const query = `
 			select id, coalesce(archived, 0), coalesce(cwd, ''),
+				coalesce(first_user_message, ''),
 				substr(replace(replace(replace(replace(
 					coalesce(nullif(name, ''), nullif(title, ''), nullif(preview, ''), ''),
 					char(9), ' '), char(10), ' '), char(13), ' '), char(27), ''), 1, 100)
@@ -88,9 +91,9 @@ func getAllCodexSessions(ctx context.Context) (model.SessionsById, error) {
 		defer rows.Close()
 
 		for rows.Next() {
-			var sessionId, workDir, title string
+			var sessionId, workDir, firstMessage, title string
 			var archived int64
-			if err := rows.Scan(&sessionId, &archived, &workDir, &title); err != nil {
+			if err := rows.Scan(&sessionId, &archived, &workDir, &firstMessage, &title); err != nil {
 				return nil, fmt.Errorf("read Codex session: %w", err)
 			}
 			state := model.NotLoaded
@@ -98,12 +101,13 @@ func getAllCodexSessions(ctx context.Context) (model.SessionsById, error) {
 				state = model.Archived
 			}
 			result[sessionId] = model.Session{
-				Hostname: hostname,
-				Id:       sessionId,
-				WorkDir:  workDir,
-				Title:    title,
-				State:    state,
-				SyncedAt: syncedAt,
+				Hostname:     hostname,
+				Id:           sessionId,
+				WorkDir:      workDir,
+				Title:        title,
+				FirstMessage: firstMessage,
+				State:        state,
+				SyncedAt:     syncedAt,
 			}
 		}
 
@@ -119,27 +123,29 @@ func getAllCodexSessions(ctx context.Context) (model.SessionsById, error) {
 	if err != nil {
 		return nil, fmt.Errorf("get active Codex session files: %w", err)
 	}
-	if len(filesInfo) == 0 {
-		return result, nil
-	}
-
-	paneByTty, err := getTtyToTmuxPaneMapping(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("get tmux panes: %w", err)
-	}
-
 	threadsDB, err := openCodexDatabase(ctx, "thread_history")
 	if err != nil {
-		return nil, fmt.Errorf("failed to open threads DB: %v", err)
+		if !errors.Is(err, os.ErrNotExist) || len(filesInfo) > 0 {
+			return nil, fmt.Errorf("open Codex thread history database: %w", err)
+		}
+	} else {
+		defer threadsDB.Close()
 	}
-	defer threadsDB.Close()
+
+	var paneByTty map[string]tmuxPane
+	if len(filesInfo) > 0 {
+		paneByTty, err = getTtyToTmuxPaneMapping(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("get tmux panes: %w", err)
+		}
+	}
 
 	for _, info := range filesInfo {
 		if !validCodexFilesInfo(info) {
 			continue
 		}
 
-		paneId, ok := paneByTty[info.tty]
+		pane, ok := paneByTty[info.tty]
 		if !ok {
 			continue
 		}
@@ -154,28 +160,106 @@ func getAllCodexSessions(ctx context.Context) (model.SessionsById, error) {
 			}
 		}
 
-		session.TmuxPaneId = paneId
+		session.TmuxPaneId = pane.Id
 
-		state, err := getCodexSessionState(ctx, threadsDB, info.sessionId)
-		if err != nil {
-			return nil, fmt.Errorf("get active Codex session state: %w", err)
+		if strings.HasPrefix(pane.Title, "[ ! ] Action Required") {
+			session.State = model.ActionRequired
+		} else {
+			state, err := getCodexSessionState(ctx, threadsDB, info.sessionId)
+			if err != nil {
+				log.Printf("get active Codex session state: %v", err)
+				state = model.Unknown
+			}
+
+			session.State = state
 		}
-		session.State = state
 
 		result[info.sessionId] = session
+	}
+
+	if threadsDB != nil {
+		if err := fillCodexSessionMessages(ctx, threadsDB, result); err != nil {
+			return nil, err
+		}
 	}
 
 	return result, nil
 }
 
-func getTtyToTmuxPaneMapping(ctx context.Context) (map[string]string, error) {
+// Keep the initial user request and the latest user message or final agent answer.
+// Read history for inactive and archived sessions as well as sessions in tmux.
+func fillCodexSessionMessages(ctx context.Context, db *sql.DB, sessions model.SessionsById) error {
+	const query = `
+		with messages as (
+			select thread_id, rollout_ordinal, item_type,
+				case item_type
+					when 'userMessage' then (
+						select group_concat(json_extract(value, '$.text'), char(10))
+						from json_each(item_json, '$.content')
+						where json_extract(value, '$.type') = 'text'
+					)
+					else json_extract(item_json, '$.text')
+				end as message
+			from thread_items
+			where item_type = 'userMessage'
+				or (item_type = 'agentMessage'
+					and coalesce(json_extract(item_json, '$.phase'), 'final_answer')
+						= 'final_answer')
+		), useful_messages as (
+			select * from messages
+			where trim(message, ' ' || char(9) || char(10) || char(13)) <> ''
+		), bounds as (
+			select thread_id,
+				min(case when item_type = 'userMessage' then rollout_ordinal end) as first,
+				max(rollout_ordinal) as last
+			from useful_messages
+			group by thread_id
+		)
+		select bounds.thread_id, coalesce(first.message, ''), coalesce(last.message, '')
+		from bounds
+		left join useful_messages first
+			on first.thread_id = bounds.thread_id and first.rollout_ordinal = bounds.first
+		left join useful_messages last
+			on last.thread_id = bounds.thread_id and last.rollout_ordinal = bounds.last
+	`
+	rows, err := db.QueryContext(ctx, query)
+	if err != nil {
+		return fmt.Errorf("query Codex session messages: %w", err)
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var sessionId, firstMessage, lastMessage string
+		if err := rows.Scan(&sessionId, &firstMessage, &lastMessage); err != nil {
+			return fmt.Errorf("read Codex session messages: %w", err)
+		}
+		session, ok := sessions[sessionId]
+		if !ok {
+			continue
+		}
+		if strings.TrimSpace(session.FirstMessage) == "" {
+			session.FirstMessage = firstMessage
+		}
+		session.LastMessage = lastMessage
+		sessions[sessionId] = session
+	}
+	if err := rows.Err(); err != nil {
+		return fmt.Errorf("read Codex session messages: %w", err)
+	}
+	if err := rows.Close(); err != nil {
+		return fmt.Errorf("close Codex session messages cursor: %w", err)
+	}
+	return nil
+}
+
+func getTtyToTmuxPaneMapping(ctx context.Context) (map[string]tmuxPane, error) {
 	cmd := subprocess.Command{
 		Name: "tmux",
 		Args: []string{
 			"list-panes",
 			"-a",
 			"-F",
-			`{"id":"#{pane_id}","tty":"#{pane_tty}"}`,
+			`{"id":"#{pane_id}","tty":"#{pane_tty}","title":"#{pane_title}"}`,
 		},
 	}
 
@@ -194,9 +278,9 @@ func getTtyToTmuxPaneMapping(ctx context.Context) (map[string]string, error) {
 		return nil, err
 	}
 
-	result := make(map[string]string)
+	result := make(map[string]tmuxPane)
 	for _, pane := range tmuxPanes {
-		result[pane.Tty] = pane.Id
+		result[pane.Tty] = pane
 	}
 
 	return result, nil
