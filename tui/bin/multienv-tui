@@ -77,11 +77,12 @@ toggle_archived() {
 ui_jq_helpers() {
     cat <<'JQ'
         def text: tostring | gsub("[\u0000-\u001f\u007f-\u009f]"; " ");
-        def colored_state:
+        def colored_state($default):
             (.state // "Unknown" | text) as $state |
             ({Working: 36, Idle: 32, ActionRequired: "1;91", Approval: 33, Input: 33,
-              Archived: 33, Error: 31}[$state] // 2) as $color |
+              Archived: 33, Error: 31}[$state] // $default) as $color |
             "\u001b[\($color)m\($state)\u001b[0m";
+        def colored_state: colored_state(2);
 JQ
 }
 
@@ -119,20 +120,27 @@ preview_session() {
     local session host
     session="$(decode_session "${1:-}")" || return
     host="$(jq -r '.hostname' <<<"$session")"
-    printf 'Host: %s\n\n' "$(ui_host_alias "$host")"
-    jq -r "$(ui_jq_helpers)"'
+    jq -r --arg host_alias "$(ui_host_alias "$host")" "$(ui_jq_helpers)"'
+        def styled($code): "\u001b[\($code)m\(.)\u001b[0m";
+        def field($label):
+            (. // "" | text) as $value |
+            "\($label): \(if $value == "" then "—" else $value end)" | styled("90");
         def message:
-            if . == "" then "—"
+            if test("^[[:space:]]*$") then "—" | styled("90")
             else gsub("[\u0000-\u0009\u000b-\u001f\u007f-\u009f]"; " ") end;
-        "Title: \((.title // .id) | text)", "",
-        "State: \(colored_state)",
-        "Directory: \((.work_dir // "") | text)", "",
-        "Session: \(.id | text)",
-        "Pane: \((if (.tmux_pane_id // "") == "" then "—"
-                  else .tmux_pane_id end) | text)",
-        "Synced: \((.synced_at // "—") | text)", "",
-        "First message:", (.first_message // "" | message), "",
-        "Last message:", (.last_message // "" | message)
+        ((.title // "" | text) as $title |
+            (if ($title | test("^[[:space:]]*$")) then .id | text else $title end) |
+            styled("1;36")), "",
+        "\u001b[1mState: \(colored_state("1;37"))\u001b[0m", "",
+        (("Host: " | styled("90")) + $host_alias),
+        (.work_dir | field("Directory")),
+        (.id | field("Session")),
+        (.tmux_pane_id | field("Pane")),
+        (.synced_at | field("Synced")), "",
+        ("First Message" | styled("1;35")), "",
+        (.first_message // "" | message), "",
+        ("Last Message" | styled("1;35")), "",
+        (.last_message // "" | message)
     ' <<<"$session"
 }
 
@@ -348,7 +356,7 @@ run_picker() {
         args+=(--preview-window=hidden)
     else
         popup_enabled && args+=(--tmux=center,90%,90%)
-        args+=(--layout=reverse)
+        args+=(--layout=reverse --tabstop=16)
         args+=(--preview="$self_command --preview {6}")
         args+=(--preview-window='right,50%,border-left,wrap')
     fi
