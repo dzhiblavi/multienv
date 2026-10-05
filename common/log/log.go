@@ -6,13 +6,13 @@ import (
 )
 
 func Info(ctx context.Context, msg string, args ...any) {
-	slog.InfoContext(ctx, msg, args...)
+	slog.InfoContext(ctx, msg, appendCustomLogData(ctx, args)...)
 }
 
 func Warn(ctx context.Context, msg string, args ...any) {
-	slog.WarnContext(ctx, msg, args...)
+	slog.WarnContext(ctx, msg, appendCustomLogData(ctx, args)...)
 }
 
 func Error(ctx context.Context, msg string, args ...any) {
-	slog.ErrorContext(ctx, msg, args...)
+	slog.ErrorContext(ctx, msg, appendCustomLogData(ctx, args)...)
 }

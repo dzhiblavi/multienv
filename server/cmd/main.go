@@ -16,7 +16,7 @@ func main() {
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer cancel()
 
-	ctx = log.InjectContextId(ctx)
+	ctx = log.InitContext(ctx)
 
 	if err := cmd.ExecuteContext(ctx); err != nil {
 		log.Error(ctx, "server failed", "error", err)

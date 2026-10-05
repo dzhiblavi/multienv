@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"log/slog"
+	"sync"
 )
 
 type contextKeyType string
@@ -12,6 +13,11 @@ type customLogDataKeyType string
 
 var contextKey contextKeyType
 var customLogDataKey customLogDataKeyType
+
+type customLogData struct {
+	mu     sync.RWMutex
+	values map[string]any
+}
 
 type ContextHandler struct {
 	slog.Handler
@@ -27,7 +33,14 @@ func (h ContextHandler) Handle(ctx context.Context, r slog.Record) error {
 	return h.Handler.Handle(ctx, r)
 }
 
-func InjectContextId(ctx context.Context) context.Context {
+func InitContext(ctx context.Context) context.Context {
+	ctx = initContextId(ctx)
+	return context.WithValue(ctx, customLogDataKey, &customLogData{
+		values: make(map[string]any),
+	})
+}
+
+func initContextId(ctx context.Context) context.Context {
 	id := generateShortID()
 	return context.WithValue(ctx, contextKey, id)
 }
@@ -38,16 +51,41 @@ func generateShortID() string {
 	return hex.EncodeToString(b)
 }
 
-func InitCustomLogData(ctx context.Context, values *map[string]any) context.Context {
-	return context.WithValue(ctx, customLogDataKey, values)
-}
-
 func AddCustomLogData(ctx context.Context, key string, value any) {
-	val := ctx.Value(customLogDataKey)
-	if val == nil {
+	data := getCustomLogData(ctx)
+	if data == nil {
 		return
 	}
 
-	customLogData := val.(*map[string]any)
-	(*customLogData)[key] = value
+	data.mu.Lock()
+	defer data.mu.Unlock()
+	data.values[key] = value
+}
+
+func getCustomLogData(ctx context.Context) *customLogData {
+	if ctx == nil {
+		return nil
+	}
+	data, _ := ctx.Value(customLogDataKey).(*customLogData)
+	return data
+}
+
+func appendCustomLogData(ctx context.Context, args []any) []any {
+	data := getCustomLogData(ctx)
+	if data == nil {
+		return args
+	}
+
+	data.mu.RLock()
+	defer data.mu.RUnlock()
+	if len(data.values) == 0 {
+		return args
+	}
+
+	fields := make([]any, len(args), len(args)+2*len(data.values))
+	copy(fields, args)
+	for key, value := range data.values {
+		fields = append(fields, key, value)
+	}
+	return fields
 }

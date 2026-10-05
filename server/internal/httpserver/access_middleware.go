@@ -33,24 +33,16 @@ func AccessLogMiddleware() Middleware {
 			start := time.Now()
 			respWriter := newLoggingResponseWriter(w)
 
-			customLogData := make(map[string]any)
-			ctx := r.Context()
-			ctx = log.InitCustomLogData(ctx, &customLogData)
-			ctx = log.InjectContextId(ctx)
+			ctx := log.InitContext(r.Context())
 
 			r = r.WithContext(ctx)
 			handler(respWriter, r)
 
-			args := []any{
+			log.Info(ctx, "request processed",
 				"path", r.URL.Path,
 				"code", respWriter.statusCode,
 				"exec_sec", time.Since(start).Seconds(),
-			}
-			for key, value := range customLogData {
-				args = append(args, key, value)
-			}
-
-			log.Info(ctx, "request processed", args...)
+			)
 		}
 	}
 }
