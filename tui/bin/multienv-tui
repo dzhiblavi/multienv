@@ -21,6 +21,17 @@ printf -v self_command '%q %q' "$BASH" "${script_dir}/multienv-tui"
 printf -v child_shell '%q -c' "$BASH"
 log_file=/tmp/multienv-tui-last-run.log
 sync_pid=''
+export MULTIENV_TUI_POPUP="${MULTIENV_TUI_POPUP:-1}"
+
+popup_enabled() {
+    [[ "$MULTIENV_TUI_POPUP" == 1 ]]
+}
+
+ui_fzf() {
+    local display_args=(--no-popup --no-height)
+    popup_enabled && display_args=(--tmux)
+    fzf "${display_args[@]}" "$@"
+}
 
 ui_host_alias() {
     local host="${1:?need hostname}"
@@ -164,7 +175,12 @@ rename_session() {
 }
 
 query_string() {
-    local prompt="${1:?need prompt}" response_file popup_command
+    local prompt="${1:?need prompt}" response_file popup_command response
+    if ! popup_enabled; then
+        IFS= read -r -p "$prompt: " response </dev/tty || return
+        printf '%s\n' "$response"
+        return
+    fi
     response_file="$(mktemp "${MULTIENV_TUI_STATE_DIR}/response.XXXXXX")" || return
     printf -v popup_command 'printf %%s %q; IFS= read -r response; ' "$prompt: "
     printf -v popup_command '%sprintf "%%s\\n" "$response" > %q' \
@@ -180,7 +196,7 @@ create_session() {
     hosts="$(printf '%s\n' "$hosts" "${c_hostnames[@]}" | sed '/^$/d' | sort -u)"
     aliases="$(host_aliases <<<"$hosts")" || return
     selected="$(jq -r 'to_entries[] | [.value, .key] | @tsv' <<<"$aliases" |
-        fzf --tmux --ansi --select-1 --no-multi --no-expect \
+        ui_fzf --ansi --select-1 --no-multi --no-expect \
             --delimiter=$'\t' --with-nth=1 --accept-nth=2 --prompt='Choose host ❯ ' \
             --preview-window=hidden)" || return 0
     [[ -n "$selected" ]] || return 0
@@ -204,7 +220,7 @@ create_codex_pane() {
         show_error 'Create a tmux session on this host first'
         return 1
     fi
-    selected="$(fzf --tmux --ansi --select-1 --no-multi --no-expect \
+    selected="$(ui_fzf --ansi --select-1 --no-multi --no-expect \
         --delimiter=$'\t' --with-nth=1,2,3 --accept-nth=6 \
         --prompt='Resume in tmux session ❯ ' --preview-window=hidden <<<"$options")" || return
     [[ -n "$selected" ]] || return 1
@@ -223,6 +239,31 @@ create_codex_pane() {
     }
 }
 
+resume_codex_here() {
+    local session="${1:?need session}" id work_dir
+    local args=(--no-daemon)
+    command -v codex >/dev/null || { show_error 'Missing command: codex'; return 1; }
+    id="$(jq -r '.id' <<<"$session")"
+    work_dir="$(jq -r '.work_dir // empty' <<<"$session")"
+    if [[ -n "$work_dir" ]]; then
+        [[ -d "$work_dir" ]] || { show_error 'Session directory not found'; return 1; }
+        args+=(--cd "$work_dir")
+    fi
+    args+=(resume "$id")
+    if [[ "$(jq -r '.state' <<<"$session")" == Archived ]]; then
+        if ! jq '{hostname, session_id: .id}' <<<"$session" |
+            codex-agent unarchive-session >>"$log_file" 2>&1; then
+            show_error 'Unarchive failed'
+            return 1
+        fi
+    fi
+    # Stop the dashboard before replacing it; Codex owns this pane and its terminal.
+    cleanup
+    trap - EXIT INT TERM
+    # Preserve the pane's TTY descriptors; /dev/tty cannot be polled by kqueue on macOS.
+    exec codex "${args[@]}"
+}
+
 open_codex_session() {
     local encoded="${1:?need session}" session host id pane
     session="$(decode_session "$encoded")" || return
@@ -236,6 +277,10 @@ open_codex_session() {
     }
     pane="$(jq -r '.tmux_pane_id // empty' <<<"$session")"
     if [[ -z "$pane" ]]; then
+        if ! popup_enabled && is_on_hostname "$host"; then
+            resume_codex_here "$session"
+            return
+        fi
         pane="$(create_codex_pane "$host" "$id")" || return
         if ! jq -n --arg host "$host" --arg id "$id" --arg pane "$pane" \
             '{hostname: $host, session_id: $id, tmux_pane_id: $pane}' |
@@ -276,18 +321,18 @@ picker_bindings() {
 
 run_picker() {
     local mode="${1:?need mode}" query="${2:-}" options keys=ctrl-b
-    local popup=--tmux args=()
+    local args=()
     options="$(list_options "$mode")" || return
     if [[ "$mode" == tmux ]]; then
         keys+=,ctrl-n
         args+=(--preview-window=hidden)
     else
-        popup=--tmux=center,90%,90%
+        popup_enabled && args+=(--tmux=center,90%,90%)
         args+=(--layout=reverse)
         args+=(--preview="$self_command --preview {6}")
         args+=(--preview-window='right,50%,border-left,wrap')
     fi
-    fzf "$popup" --ansi --multi --no-select-1 --no-expect --expect="$keys" \
+    ui_fzf --ansi --multi --no-select-1 --no-expect --expect="$keys" \
         --prompt='❯ ' --delimiter=$'\t' --with-nth=1,2,3 --nth=1,2,3 \
         --track --id-nth=4,5 --print-query --query="$query" \
         --header="$(ui_header "$mode")" --with-shell="$child_shell" \
@@ -369,6 +414,29 @@ main() {
     done
 }
 
+usage() {
+    printf 'Usage: multienv-tui [--no-popup] [tmux|codex]\n\n'
+    printf '  --no-popup  Show the dashboard in the current tmux pane\n'
+    printf '              Local resume replaces the dashboard in this pane\n\n'
+    ui_header tmux
+    printf '\n'
+    ui_header codex
+}
+
+start_ui() {
+    local mode=tmux
+    while (( $# > 0 )); do
+        case "$1" in
+            --no-popup) export MULTIENV_TUI_POPUP=0 ;;
+            tmux|codex) mode="$1" ;;
+            --help|-h) usage; return ;;
+            *) printf 'Unknown option: %s\n' "$1" >&2; return 2 ;;
+        esac
+        shift
+    done
+    main "$mode"
+}
+
 dispatch() {
     case "${1:-tmux}" in
         --list) list_options "${2:?need mode}" "${3:-}" ;;
@@ -377,13 +445,7 @@ dispatch() {
         --toggle-archived) toggle_archived ;;
         --action) shift; session_action "$@" ;;
         --rename) [[ -z "${2:-}" ]] || rename_session "$2" ;;
-        tmux|codex) main "${1:-tmux}" ;;
-        --help|-h)
-            printf 'Usage: multienv-tui [tmux|codex]\n\n'
-            ui_header tmux
-            printf '\n'
-            ui_header codex
-            ;;
+        tmux|codex|--no-popup|--help|-h|'') start_ui "$@" ;;
         *) printf 'Unknown option: %s\n' "$1" >&2; return 2 ;;
     esac
 }
