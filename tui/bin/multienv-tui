@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 ensure_bash() {
-    (( BASH_VERSINFO[0] >= 4 )) && return
+    ((BASH_VERSINFO[0] >= 4)) && return
     local candidate
     for candidate in /opt/homebrew/bin/bash /usr/local/bin/bash; do
         [[ -x "$candidate" ]] && exec "$candidate" "$0" "$@"
@@ -128,15 +128,15 @@ preview_session() {
         def message:
             if test("^[[:space:]]*$") then "—" | styled("90")
             else gsub("[\u0000-\u0009\u000b-\u001f\u007f-\u009f]"; " ") end;
-        ((.title // "" | text) as $title |
-            (if ($title | test("^[[:space:]]*$")) then .id | text else $title end) |
-            styled("1;36")), "",
-        "\u001b[1mState: \(colored_state("1;37"))\u001b[0m", "",
         (("Host: " | styled("90")) + $host_alias),
         (.work_dir | field("Directory")),
         (.id | field("Session")),
         (.tmux_pane_id | field("Pane")),
         (.synced_at | field("Synced")), "",
+        ((.title // "" | text) as $title |
+            (if ($title | test("^[[:space:]]*$")) then .id | text else $title end) |
+            styled("1;36")), "",
+        "\u001b[1mState: \(colored_state("1;37"))\u001b[0m", "",
         ("First Message" | styled("1;35")), "",
         (.first_message // "" | message), "",
         ("Last Message" | styled("1;35")), "",
@@ -254,9 +254,15 @@ create_codex_pane() {
 exec_codex() {
     local id="${1:?need session id}" work_dir="${2:-}"
     local args=(--no-daemon)
-    command -v codex >/dev/null || { show_error 'Missing command: codex'; return 1; }
+    command -v codex >/dev/null || {
+        show_error 'Missing command: codex'
+        return 1
+    }
     if [[ -n "$work_dir" ]]; then
-        [[ -d "$work_dir" ]] || { show_error 'Session directory not found'; return 1; }
+        [[ -d "$work_dir" ]] || {
+            show_error 'Session directory not found'
+            return 1
+        }
         args+=(--cd "$work_dir")
     fi
     args+=(resume "$id")
@@ -270,7 +276,7 @@ exec_codex() {
 wait_for_visible_pane() {
     local pane="${1:?need pane id}" timeout="${2:-60}" deadline state
     deadline=$((SECONDS + timeout))
-    while (( SECONDS < deadline )); do
+    while ((SECONDS < deadline)); do
         state="$(tmux display-message -p -t "$pane" \
             '#{pane_active}:#{window_active}:#{session_attached}' 2>>"$log_file")" || {
             show_error 'Cannot check Codex pane visibility'
@@ -333,9 +339,9 @@ picker_bindings() {
         local key action
         for key in ctrl-a ctrl-u ctrl-x; do
             case "$key" in
-                ctrl-a) action=archive-session ;;
-                ctrl-u) action=unarchive-session ;;
-                ctrl-x) action=delete-session ;;
+            ctrl-a) action=archive-session ;;
+            ctrl-u) action=unarchive-session ;;
+            ctrl-x) action=delete-session ;;
             esac
             bindings+=",$key:execute-silent($self_command --action codex $action {+6})"
             bindings+="+reload-sync($self_command --list codex)+clear-multi"
@@ -412,8 +418,8 @@ main() {
     while true; do
         selected="$(run_picker "$mode" "${queries[$mode]}")"
         status=$?
-        (( status == 130 )) && return 0
-        if (( status != 0 )) && [[ -z "$selected" ]]; then
+        ((status == 130)) && return 0
+        if ((status != 0)) && [[ -z "$selected" ]]; then
             return "$status"
         fi
         query="${selected%%$'\n'*}"
@@ -422,22 +428,22 @@ main() {
         rows="${rows#*$'\n'}"
         queries[$mode]="$query"
         case "$key" in
-            ctrl-b)
-                if [[ "$mode" == tmux ]]; then mode=codex; else mode=tmux; fi
-                ;;
-            ctrl-n) create_session ;;
-            '')
-                [[ "$rows" == *$'\t'* ]] || continue
-                encoded="$(cut -f6 <<<"${rows%%$'\n'*}")"
-                if [[ "$mode" == codex ]]; then
-                    open_codex_session "$encoded" && return 0
-                else
-                    selected="$(decode_session "$encoded")" || return
-                    select_session "$(jq -r '.hostname' <<<"$selected")" \
-                        "$(jq -r '.id' <<<"$selected")" && return 0
-                fi
-                ;;
-            *) return 0 ;;
+        ctrl-b)
+            if [[ "$mode" == tmux ]]; then mode=codex; else mode=tmux; fi
+            ;;
+        ctrl-n) create_session ;;
+        '')
+            [[ "$rows" == *$'\t'* ]] || continue
+            encoded="$(cut -f6 <<<"${rows%%$'\n'*}")"
+            if [[ "$mode" == codex ]]; then
+                open_codex_session "$encoded" && return 0
+            else
+                selected="$(decode_session "$encoded")" || return
+                select_session "$(jq -r '.hostname' <<<"$selected")" \
+                    "$(jq -r '.id' <<<"$selected")" && return 0
+            fi
+            ;;
+        *) return 0 ;;
         esac
     done
 }
@@ -453,12 +459,18 @@ usage() {
 
 start_ui() {
     local mode=tmux
-    while (( $# > 0 )); do
+    while (($# > 0)); do
         case "$1" in
-            --no-popup) export MULTIENV_TUI_POPUP=0 ;;
-            tmux|codex) mode="$1" ;;
-            --help|-h) usage; return ;;
-            *) printf 'Unknown option: %s\n' "$1" >&2; return 2 ;;
+        --no-popup) export MULTIENV_TUI_POPUP=0 ;;
+        tmux | codex) mode="$1" ;;
+        --help | -h)
+            usage
+            return
+            ;;
+        *)
+            printf 'Unknown option: %s\n' "$1" >&2
+            return 2
+            ;;
         esac
         shift
     done
@@ -467,15 +479,21 @@ start_ui() {
 
 dispatch() {
     case "${1:-tmux}" in
-        --list) list_options "${2:?need mode}" "${3:-}" ;;
-        --preview) [[ -z "${2:-}" ]] || preview_session "$2" ;;
-        --header) ui_header "${2:?need mode}" ;;
-        --toggle-archived) toggle_archived ;;
-        --action) shift; session_action "$@" ;;
-        --rename) [[ -z "${2:-}" ]] || rename_session "$2" ;;
-        --resume-when-visible) resume_when_visible "${2:?need session id}" ;;
-        tmux|codex|--no-popup|--help|-h|'') start_ui "$@" ;;
-        *) printf 'Unknown option: %s\n' "$1" >&2; return 2 ;;
+    --list) list_options "${2:?need mode}" "${3:-}" ;;
+    --preview) [[ -z "${2:-}" ]] || preview_session "$2" ;;
+    --header) ui_header "${2:?need mode}" ;;
+    --toggle-archived) toggle_archived ;;
+    --action)
+        shift
+        session_action "$@"
+        ;;
+    --rename) [[ -z "${2:-}" ]] || rename_session "$2" ;;
+    --resume-when-visible) resume_when_visible "${2:?need session id}" ;;
+    tmux | codex | --no-popup | --help | -h | '') start_ui "$@" ;;
+    *)
+        printf 'Unknown option: %s\n' "$1" >&2
+        return 2
+        ;;
     esac
 }
 
