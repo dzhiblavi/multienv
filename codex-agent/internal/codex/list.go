@@ -4,10 +4,12 @@ import (
 	"bytes"
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
 	"regexp"
+	"slices"
 	"strings"
 	"time"
 
@@ -42,6 +44,7 @@ func GetSessionToTmuxPaneMapping(ctx context.Context) (map[string]string, error)
 	}
 
 	result := make(map[string]string)
+	filesInfo = codexFilesInfoForTmux(filesInfo)
 	if len(filesInfo) == 0 {
 		return result, nil
 	}
@@ -68,6 +71,7 @@ func getAllCodexSessions(ctx context.Context) (model.SessionsById, error) {
 
 	syncedAt := time.Now()
 	result := make(model.SessionsById)
+	guardianIds := make(map[string]bool)
 	db, err := openCodexDatabase(ctx, "state")
 	if err != nil && !errors.Is(err, os.ErrNotExist) {
 		return nil, fmt.Errorf("open Codex sessions database: %w", err)
@@ -76,7 +80,7 @@ func getAllCodexSessions(ctx context.Context) (model.SessionsById, error) {
 	if err == nil {
 		defer db.Close()
 		const query = `
-			select id, coalesce(archived, 0), coalesce(cwd, ''),
+			select id, coalesce(source, ''), coalesce(archived, 0), coalesce(cwd, ''),
 				coalesce(first_user_message, ''),
 				substr(replace(replace(replace(replace(
 					coalesce(nullif(name, ''), nullif(title, ''), nullif(preview, ''), ''),
@@ -91,10 +95,14 @@ func getAllCodexSessions(ctx context.Context) (model.SessionsById, error) {
 		defer rows.Close()
 
 		for rows.Next() {
-			var sessionId, workDir, firstMessage, title string
+			var sessionId, source, workDir, firstMessage, title string
 			var archived int64
-			if err := rows.Scan(&sessionId, &archived, &workDir, &firstMessage, &title); err != nil {
+			if err := rows.Scan(&sessionId, &source, &archived, &workDir, &firstMessage, &title); err != nil {
 				return nil, fmt.Errorf("read Codex session: %w", err)
+			}
+			if isGuardianSessionSource(source) {
+				guardianIds[sessionId] = true
+				continue
 			}
 			state := model.NotLoaded
 			if archived != 0 {
@@ -123,6 +131,10 @@ func getAllCodexSessions(ctx context.Context) (model.SessionsById, error) {
 	if err != nil {
 		return nil, fmt.Errorf("get active Codex session files: %w", err)
 	}
+	// An open writer lock must not reintroduce a filtered Guardian thread.
+	filesInfo = slices.DeleteFunc(filesInfo, func(info codexFilesInfo) bool {
+		return guardianIds[info.sessionId]
+	})
 	threadsDB, err := openCodexDatabase(ctx, "thread_history")
 	if err != nil {
 		if !errors.Is(err, os.ErrNotExist) || len(filesInfo) > 0 {
@@ -133,10 +145,10 @@ func getAllCodexSessions(ctx context.Context) (model.SessionsById, error) {
 	}
 
 	var paneByTty map[string]tmuxPane
-	if len(filesInfo) > 0 {
+	if len(codexFilesInfoForTmux(filesInfo)) > 0 {
 		paneByTty, err = getTtyToTmuxPaneMapping(ctx)
 		if err != nil {
-			return nil, fmt.Errorf("get tmux panes: %w", err)
+			log.Warn(ctx, "failed to get tmux panes", "error", err)
 		}
 	}
 
@@ -145,9 +157,9 @@ func getAllCodexSessions(ctx context.Context) (model.SessionsById, error) {
 			continue
 		}
 
-		pane, ok := paneByTty[info.tty]
-		if !ok {
-			continue
+		var pane tmuxPane
+		if info.tty != "" && !info.ambiguousTty && !info.ambiguousId {
+			pane = paneByTty[info.tty]
 		}
 
 		session, exists := result[info.sessionId]
@@ -162,7 +174,7 @@ func getAllCodexSessions(ctx context.Context) (model.SessionsById, error) {
 
 		session.TmuxPaneId = pane.Id
 
-		if strings.HasPrefix(pane.Title, "[ ! ] Action Required") {
+		if pane.Id != "" && strings.HasPrefix(pane.Title, "[ ! ] Action Required") {
 			session.State = model.ActionRequired
 		} else {
 			state, err := getCodexSessionState(ctx, threadsDB, info.sessionId)
@@ -188,7 +200,7 @@ func getAllCodexSessions(ctx context.Context) (model.SessionsById, error) {
 }
 
 // Keep the initial user request and the latest user message or final agent answer.
-// Read history for inactive and archived sessions as well as sessions in tmux.
+// Read history for inactive and archived sessions as well as loaded sessions.
 func fillCodexSessionMessages(ctx context.Context, db *sql.DB, sessions model.SessionsById) error {
 	const query = `
 		with messages as (
@@ -311,7 +323,20 @@ func getCodexFilesInfo(ctx context.Context) ([]codexFilesInfo, error) {
 	lockFileRegex := regexp.MustCompile(`/thread-writer-locks/([[:xdigit:]-]+)\.lock$`)
 
 	info := codexFilesInfo{}
+	var sessionIds []string
 	var result []codexFilesInfo
+	appendFilesInfo := func() {
+		// One Codex process can own several threads, including sub-agent threads.
+		// Each open writer lock proves activity, but multiple IDs cannot be mapped
+		// unambiguously to a tmux pane.
+		for _, sessionId := range sessionIds {
+			sessionInfo := info
+			sessionInfo.sessionId = sessionId
+			if validCodexFilesInfo(sessionInfo) {
+				result = append(result, sessionInfo)
+			}
+		}
+	}
 
 	for field := range bytes.SplitSeq([]byte(lsofResult.Stdout), []byte{0}) {
 		field = bytes.TrimLeft(field, "\n")
@@ -324,10 +349,9 @@ func getCodexFilesInfo(ctx context.Context) ([]codexFilesInfo, error) {
 
 		switch tag {
 		case "p":
-			if validCodexFilesInfo(info) {
-				result = append(result, info)
-			}
+			appendFilesInfo()
 			info = codexFilesInfo{}
+			sessionIds = nil
 
 		case "c":
 			info.command = value
@@ -339,31 +363,44 @@ func getCodexFilesInfo(ctx context.Context) ([]codexFilesInfo, error) {
 				}
 				info.tty = value
 			} else if id := lockFileRegex.FindStringSubmatch(value); id != nil {
-				if info.sessionId != "" && info.sessionId != id[1] {
-					info.ambiguousId = true
+				if !slices.Contains(sessionIds, id[1]) {
+					sessionIds = append(sessionIds, id[1])
 				}
-				info.sessionId = id[1]
+				info.ambiguousId = len(sessionIds) > 1
 			}
 		}
 	}
 
-	if validCodexFilesInfo(info) {
-		result = append(result, info)
-	}
+	appendFilesInfo()
 
 	return result, nil
 }
 
-func validCodexFilesInfo(info codexFilesInfo) bool {
-	if info.command != "codex" || info.sessionId == "" || info.tty == "" {
-		return false
+func isGuardianSessionSource(source string) bool {
+	var parsed struct {
+		Subagent struct {
+			Other string `json:"other"`
+		} `json:"subagent"`
 	}
+	return json.Unmarshal([]byte(source), &parsed) == nil && parsed.Subagent.Other == "guardian"
+}
 
-	if info.ambiguousId || info.ambiguousTty {
+func validCodexFilesInfo(info codexFilesInfo) bool {
+	if info.command != "codex" || info.sessionId == "" {
 		return false
 	}
 
 	return true
+}
+
+func codexFilesInfoForTmux(filesInfo []codexFilesInfo) []codexFilesInfo {
+	var result []codexFilesInfo
+	for _, info := range filesInfo {
+		if info.tty != "" && !info.ambiguousTty && !info.ambiguousId {
+			result = append(result, info)
+		}
+	}
+	return result
 }
 
 func getCodexSessionState(ctx context.Context, db *sql.DB, sessionId string) (model.State, error) {
