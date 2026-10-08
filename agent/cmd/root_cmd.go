@@ -4,6 +4,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"multienv/agent/cmd/codex"
+	"multienv/agent/cmd/master"
 	"multienv/agent/cmd/tmux"
 )
 
@@ -11,7 +12,7 @@ func newRootCmd() *cobra.Command {
 	var configPath string
 	cmd := &cobra.Command{
 		Use:               "multienv-agent",
-		Short:             "manage tmux and Codex sessions across connected workspace",
+		Short:             "manage workspace sessions and execute commands on the server host",
 		SilenceErrors:     true,
 		SilenceUsage:      true,
 		CompletionOptions: cobra.CompletionOptions{DisableDefaultCmd: true},
@@ -23,6 +24,9 @@ func newRootCmd() *cobra.Command {
 		"~/.config/multienv/agent.yaml",
 		"path to configuration file",
 	)
-	cmd.AddCommand(tmux.NewCommand(&configPath), codex.NewCommand(&configPath))
+
+	cmd.AddCommand(tmux.NewCommand(&configPath))
+	cmd.AddCommand(codex.NewCommand(&configPath))
+	cmd.AddCommand(master.NewCommand(&configPath))
 	return cmd
 }

@@ -8,6 +8,7 @@ import (
 	"multienv/common/util"
 	"multienv/server/internal/codex"
 	"multienv/server/internal/httpserver"
+	"multienv/server/internal/master"
 	"multienv/server/internal/storage"
 	redisstorage "multienv/server/internal/storage/redis"
 	"multienv/server/internal/tmux"
@@ -83,6 +84,11 @@ func newRootCmd() *cobra.Command {
 			if err := app.server.Install("codex", codexDispatcher); err != nil {
 				app.Close()
 				return fmt.Errorf("install codex dispatcher: %w", err)
+			}
+
+			if err := app.server.Install("master", master.New()); err != nil {
+				app.Close()
+				return fmt.Errorf("install master dispatcher: %w", err)
 			}
 
 			return nil
