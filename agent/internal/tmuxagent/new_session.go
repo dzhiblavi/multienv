@@ -2,9 +2,9 @@ package agent
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 
+	client "multienv/agent/internal/client/tmux"
 	"multienv/agent/internal/tmux"
 	"multienv/common/tmux/model"
 	"multienv/common/tmux/operations"
@@ -40,20 +40,13 @@ func (a Agent) newLocalSession(ctx context.Context, name string) (*model.Session
 }
 
 func (a Agent) newRemoteSession(ctx context.Context, params NewSessionParams) (*model.Session, error) {
-	op := operations.ForwardAgentRequest{
+	session, err := client.ForwardAgent[model.Session](ctx, a.client, operations.ForwardAgentRequest{
 		Hostname: params.Hostname,
 		Command:  "new-session",
 		Input:    params,
-	}
-
-	result, err := a.client.ForwardAgent(ctx, op)
+	})
 	if err != nil {
-		return nil, fmt.Errorf("forward agent call failed: %v", err)
-	}
-
-	var session model.Session
-	if err = json.Unmarshal([]byte(result.Output), &session); err != nil {
-		return nil, fmt.Errorf("agent's response is invalid: %v", err)
+		return nil, err
 	}
 
 	return &session, nil

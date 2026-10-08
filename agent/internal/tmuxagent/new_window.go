@@ -2,9 +2,9 @@ package agent
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 
+	client "multienv/agent/internal/client/tmux"
 	"multienv/agent/internal/tmux"
 	"multienv/common/tmux/operations"
 )
@@ -35,19 +35,13 @@ func (a Agent) NewWindow(ctx context.Context, params NewWindowParams) (*NewWindo
 		return &NewWindowResult{TmuxPaneId: paneId}, nil
 	}
 
-	op := operations.ForwardAgentRequest{
+	result, err := client.ForwardAgent[NewWindowResult](ctx, a.client, operations.ForwardAgentRequest{
 		Hostname: params.Hostname,
 		Command:  "new-window",
 		Input:    params,
-	}
-	response, err := a.client.ForwardAgent(ctx, op)
+	})
 	if err != nil {
-		return nil, fmt.Errorf("forward agent call failed: %w", err)
-	}
-
-	var result NewWindowResult
-	if err := json.Unmarshal([]byte(response.Output), &result); err != nil {
-		return nil, fmt.Errorf("agent's response is invalid: %w", err)
+		return nil, err
 	}
 	return &result, nil
 }

@@ -2,10 +2,10 @@ package agent
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"os"
 
+	client "multienv/agent/internal/client/codex"
 	"multienv/agent/internal/codex"
 	"multienv/common/codex/model"
 	"multienv/common/codex/operations"
@@ -76,19 +76,9 @@ func (a Agent) prepareRemoteResume(
 	ctx context.Context,
 	params PrepareResumeParams,
 ) (model.Session, error) {
-	response, err := a.client.ForwardAgent(ctx, operations.ForwardAgentRequest{
+	return client.ForwardAgent[model.Session](ctx, a.client, operations.ForwardAgentRequest{
 		Hostname: params.Hostname,
 		Command:  "prepare-resume",
 		Input:    params,
 	})
-	if err != nil {
-		return model.Session{}, fmt.Errorf("forward prepare-resume: %w", err)
-	}
-
-	var session model.Session
-	if err := json.Unmarshal([]byte(response.Output), &session); err != nil {
-		return model.Session{}, fmt.Errorf("invalid prepare-resume response: %w", err)
-	}
-
-	return session, nil
 }
