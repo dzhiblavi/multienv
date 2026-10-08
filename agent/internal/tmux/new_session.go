@@ -15,7 +15,7 @@ func NewSession(ctx context.Context, name string) (model.Session, error) {
 		Args: []string{
 			"new-session", "-d",
 			"-s", name,
-			"-P", "-F", "#{session_id}",
+			"-P", "-F", sessionFormat,
 		},
 	}
 
@@ -24,10 +24,5 @@ func NewSession(ctx context.Context, name string) (model.Session, error) {
 		return model.Session{}, err
 	}
 
-	return model.Session{
-		Id:          strings.TrimSpace(result.Stdout),
-		Name:        name,
-		WindowCount: 1,
-		SyncedAt:    time.Now(),
-	}, nil
+	return parseSession(strings.TrimSuffix(result.Stdout, "\n"), time.Now())
 }

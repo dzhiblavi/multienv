@@ -51,5 +51,11 @@ The preview shows `Synced` as a relative age (for example, `3 seconds ago` or
 `2 minutes ago`). Values older than 10 seconds are red. The age refreshes every
 two seconds, including when the selected session has not changed.
 
-In tmux mode, the same `Synced` age appears next to the window count in each
-row and refreshes every two seconds. A missing or invalid timestamp shows `—`.
+Tmux sessions are sorted by their last attachment time, newest first, across
+all hosts. This order is preserved when filtering. Sessions without an
+attachment time appear last. A green `●` before the name indicates one or more
+attached clients. If the snapshot is older than 30 seconds, a red `!` replaces
+the attachment indicator, including for detached sessions. Indicators refresh
+every two seconds. Each row also shows the window count, command and directory
+of the active pane in the active window. Home directories are abbreviated to
+`~`, and long paths are shortened to their last 47 characters with a leading `…`.

@@ -91,6 +91,9 @@ ui_jq_helpers() {
     cat <<'JQ'
         def text: tostring | gsub("[\u0000-\u001f\u007f-\u009f]"; " ");
         def styled($code): "\u001b[\($code)m\(.)\u001b[0m";
+        def short_path:
+            text | sub("^/(Users|home)/[^/]+(?=/|$)"; "~") |
+            if length > 48 then "…" + .[-47:] else . end;
         def field($label):
             (. // "" | text) as $value |
             "\($label): \(if $value == "" then "—" else $value end)" | styled("90");
@@ -117,6 +120,11 @@ ui_jq_helpers() {
                 ("Synced: " | styled("90")) +
                 ($age | elapsed | styled(if $age > 10 then "1;31" else "90" end))
             end;
+        def tmux_indicator($now):
+            ((try (.synced_at // "" | sync_epoch) catch null) // null) as $synced |
+            if $synced != null and $now - $synced > 30 then "!" | styled("31")
+            elif (.attached // 0) > 0 then "●" | styled("32")
+            else " " end;
         def display_state:
             if .state == "Working" and (.tmux_pane_id // "") == "" then
                 "Working (bg)"
@@ -153,17 +161,22 @@ list_options() {
         # Validate every rule before emitting rows, even if there are no sessions.
         ($patterns | map(. as $pattern | try ("" | test($pattern))
             catch error("Invalid TUI ignore regex \($pattern): \(.)"))) as $_ |
-        to_entries[] | .key as $host |
-        select($host_filter == "" or $host == $host_filter) |
-        .value | to_entries[] |
-        .value + {hostname: $host, id: .key} |
+        [to_entries[] | .key as $host |
+            select($host_filter == "" or $host == $host_filter) |
+            .value | to_entries[] | .value + {hostname: $host, id: .key}] |
+        (if $mode == "tmux" then
+            sort_by([-(.last_attached // 0), .hostname, (.name // .id), .id])
+         else . end) | .[] | .hostname as $host |
         select($mode == "tmux" or $show_archived or .state != "Archived") |
         . as $session |
         (if $mode == "tmux" then .name else .title end) as $title |
         (if ($title // "") == "" then .id else $title end | text) as $label |
         (if $mode == "tmux" then
-            [$label, $aliases[$host],
-             ("\(.window_count) windows · " + (.synced_at | synced_field($now)))]
+            [(tmux_indicator($now) + " " + $label),
+             $aliases[$host],
+             (["\(.window_count) windows",
+               (.current_command // "" | text | select(length > 0)),
+               (.current_path // "" | short_path | select(length > 0))] | join(" · "))]
          else
             [colored_state, $aliases[$host], $label]
          end) + [$host, .id, ($session | tojson | @base64)] | @tsv |
@@ -304,7 +317,7 @@ create_codex_pane() {
     fi
     selected="$(ui_fzf --ansi --select-1 --no-multi --no-expect \
         --delimiter=$'\t' --with-nth=1,2,3 --accept-nth=6 \
-        --prompt='Resume in tmux session ❯ ' --preview-window=hidden <<<"$options")" || return
+        --prompt='Resume in tmux session ❯ ' --preview-window=hidden --no-sort <<<"$options")" || return
     [[ -n "$selected" ]] || return 1
     session_id="$(decode_session "$selected" | jq -r '.id')" || return
     result="$(jq -n --arg host "$host" --arg session "$session_id" \
@@ -436,7 +449,7 @@ run_picker() {
     options="$(list_options "$mode")" || return
     if [[ "$mode" == tmux ]]; then
         keys+=,ctrl-n
-        args+=(--preview-window=hidden)
+        args+=(--preview-window=hidden --no-sort)
     else
         refresh_binding+='+refresh-preview'
         popup_enabled && args+=(--tmux=center,90%,90%)
