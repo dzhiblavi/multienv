@@ -50,3 +50,6 @@ escaped when matching this label literally, as in the example above.
 The preview shows `Synced` as a relative age (for example, `3 seconds ago` or
 `2 minutes ago`). Values older than 10 seconds are red. The age refreshes every
 two seconds, including when the selected session has not changed.
+
+In tmux mode, the same `Synced` age appears next to the window count in each
+row and refreshes every two seconds. A missing or invalid timestamp shows `—`.
