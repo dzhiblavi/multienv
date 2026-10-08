@@ -1,0 +1,52 @@
+# TUI session filters
+
+In Codex mode, **Ctrl-T** shows or hides sessions matching the ignore file.
+Matching sessions are hidden when the TUI starts. The prompt shows the current
+setting, including when the help header is hidden. **Ctrl-G** independently
+shows or hides archived sessions; showing ignored sessions does not show hidden
+archives.
+
+The default prompt is `(-archived,+filtered) ❯`: `+archived` means archived
+sessions are shown, and `+filtered` means ignore rules are applied. Each toggle
+updates its corresponding `+`/`-` indicator.
+
+The default ignore file is `~/.config/multienv/.multienv-tui-ignore`.
+Override its path in `~/.config/multienv/tui.sh`:
+
+```bash
+c_tui_ignore_file_path="${HOME}/.multienv-tui-ignore"
+```
+
+Each nonempty line is a case-sensitive regular expression, using jq's regex
+syntax. Lines starting with `#` (optionally preceded by whitespace) are comments.
+A session is ignored if any rule matches. Rules are read on each list refresh;
+a missing file means no rules. Invalid expressions produce an error rather than
+being silently skipped.
+
+Rules match the complete row passed to fzf, with ANSI color codes removed. In
+Codex mode its six fields are separated by actual tabs:
+
+```text
+status<TAB>host alias<TAB>title (or session ID)<TAB>hostname<TAB>session ID<TAB>base64 session JSON
+```
+
+Both `\t` in a regex and literal tabs match the separators. Only the first three
+fields are displayed by fzf. Anchor a rule to the desired fields to avoid
+matching elsewhere in the row. For example, to hide background work and titles
+starting with `ailoops:`:
+
+```text
+# Working sessions without a tmux pane
+^Working \(bg\)\t
+# Titles starting with ailoops:, in any state
+^[^\t]*\t[^\t]*\tailoops:
+```
+
+`Working (bg)` is a purple TUI label for `Working` sessions without
+`tmux_pane_id`. It is also used in the preview and in the text matched by rules;
+the session's underlying state remains `Working`. Regex parentheses must be
+escaped when matching this label literally, as in the example above.
+
+The preview shows `Synced` as a relative age (for example, `3 seconds ago` or
+`2 minutes ago`). Values older than 10 seconds are red. The age refreshes every
+two seconds, including when the selected session has not changed.

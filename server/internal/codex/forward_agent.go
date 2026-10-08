@@ -5,8 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"multienv/common/subprocess"
 	"multienv/common/codex/operations"
+	"multienv/common/subprocess"
 )
 
 func (s Dispatcher) ForwardAgent(
@@ -20,8 +20,8 @@ func (s Dispatcher) ForwardAgent(
 
 	cmd := subprocess.RemoteCommand{
 		Command: subprocess.Command{
-			Name:  "~/.bin/codex-agent",
-			Args:  []string{req.Command},
+			Name:  "~/.bin/multienv-agent",
+			Args:  []string{"codex", req.Command},
 			Stdin: string(input),
 		},
 		Hostname: req.Hostname,

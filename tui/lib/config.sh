@@ -7,6 +7,7 @@ init_config() {
 
     c_ctrl_port=7777
     c_log_file_path="/tmp/multienv-tui.log"
+    c_tui_ignore_file_path="${HOME}/.config/multienv/.multienv-tui-ignore"
 
     declare -gA c_host_alias_to_hostname=()
 }

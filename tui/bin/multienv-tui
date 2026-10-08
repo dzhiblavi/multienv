@@ -74,12 +74,31 @@ toggle_archived() {
     fi
 }
 
+ignored_visible() {
+    [[ -n "${MULTIENV_TUI_STATE_DIR:-}" ]] &&
+        [[ -f "${MULTIENV_TUI_STATE_DIR}/ignored" ]]
+}
+
+toggle_ignored() {
+    if ignored_visible; then
+        rm -f "${MULTIENV_TUI_STATE_DIR}/ignored"
+    else
+        touch "${MULTIENV_TUI_STATE_DIR:?need UI state}/ignored"
+    fi
+}
+
 ui_jq_helpers() {
     cat <<'JQ'
         def text: tostring | gsub("[\u0000-\u001f\u007f-\u009f]"; " ");
+        def display_state:
+            if .state == "Working" and (.tmux_pane_id // "") == "" then
+                "Working (bg)"
+            elif .state == "ActionRequired" then
+                "Action Required"
+            else .state // "Unknown" end | text;
         def colored_state($default):
-            (.state // "Unknown" | text) as $state |
-            ({Working: 36, Idle: 32, ActionRequired: "1;91", Approval: 33, Input: 33,
+            display_state as $state |
+            ({Working: 36, "Working (bg)": 35, Idle: 32, "Action Required": "1;91", Approval: 33, Input: 33,
               Archived: 33, Error: 31}[$state] // $default) as $color |
             "\u001b[\($color)m\($state)\u001b[0m";
         def colored_state: colored_state(2);
@@ -88,14 +107,24 @@ JQ
 
 list_options() {
     local mode="${1:?need mode}" host_filter="${2:-}"
-    local sessions aliases show_archived=false
-    sessions="$("${mode}-agent" list-all 2>>"$log_file")" || return
+    local sessions aliases show_archived=false show_ignored=false ignore_file=/dev/null
+    sessions="$(multienv-agent "$mode" list-all 2>>"$log_file")" || return
     aliases="$(jq -r 'keys[]' <<<"$sessions" | host_aliases)" || return
     archived_visible && show_archived=true
+    ignored_visible && show_ignored=true
+    if [[ "$mode" == codex && "$show_ignored" == false && -f "$c_tui_ignore_file_path" ]]; then
+        ignore_file="$c_tui_ignore_file_path"
+    fi
 
     jq -r --arg mode "$mode" --arg host_filter "$host_filter" \
         --argjson aliases "$aliases" --argjson show_archived "$show_archived" \
+        --rawfile ignore_rules "$ignore_file" \
         "$(ui_jq_helpers)"'
+        ($ignore_rules | split("\n") |
+            map(sub("\r$"; "") | select(test("^\\s*(#|$)") | not))) as $patterns |
+        # Validate every rule before emitting rows, even if there are no sessions.
+        ($patterns | map(. as $pattern | try ("" | test($pattern))
+            catch error("Invalid TUI ignore regex \($pattern): \(.)"))) as $_ |
         to_entries[] | .key as $host |
         select($host_filter == "" or $host == $host_filter) |
         .value | to_entries[] |
@@ -108,7 +137,11 @@ list_options() {
             [$label, $aliases[$host], "\(.window_count) windows"]
          else
             [colored_state, $aliases[$host], $label]
-         end) + [$host, .id, ($session | tojson | @base64)] | @tsv
+         end) + [$host, .id, ($session | tojson | @base64)] | @tsv |
+        . as $row |
+        (gsub("\u001b\\[[0-9;]*m"; "")) as $plain_row |
+        select(any($patterns[]; . as $pattern | $plain_row | test($pattern)) | not) |
+        $row
     ' <<<"$sessions"
 }
 
@@ -125,6 +158,29 @@ preview_session() {
         def field($label):
             (. // "" | text) as $value |
             "\($label): \(if $value == "" then "—" else $value end)" | styled("90");
+        def sync_epoch:
+            capture("^(?<date>[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2})(?<fraction>\\.[0-9]+)?(?<zone>Z|[+-][0-9]{2}:[0-9]{2})$") |
+            (.date + "Z" | fromdateiso8601) +
+            ("0" + (.fraction // "") | tonumber) -
+            (if .zone == "Z" then 0 else
+                ((.zone[1:3] | tonumber) * 3600 + (.zone[4:6] | tonumber) * 60) *
+                (if .zone[0:1] == "+" then 1 else -1 end)
+             end);
+        def ago($unit):
+            "\(.) \($unit)\(if . == 1 then "" else "s" end) ago";
+        def elapsed:
+            if . < 1 then "just now"
+            elif . < 60 then floor | ago("second")
+            elif . < 3600 then . / 60 | floor | ago("minute")
+            elif . < 86400 then . / 3600 | floor | ago("hour")
+            else . / 86400 | floor | ago("day") end;
+        def synced_field($now):
+            ((try (. // "" | sync_epoch) catch null) // null) as $synced |
+            if $synced == null then null | field("Synced") else
+                ([$now - $synced, 0] | max) as $age |
+                ("Synced: " | styled("90")) +
+                ($age | elapsed | styled(if $age > 10 then "1;31" else "90" end))
+            end;
         def message:
             if test("^[[:space:]]*$") then "—" | styled("90")
             else gsub("[\u0000-\u0009\u000b-\u001f\u007f-\u009f]"; " ") end;
@@ -132,7 +188,7 @@ preview_session() {
         (.work_dir | field("Directory")),
         (.id | field("Session")),
         (.tmux_pane_id | field("Pane")),
-        (.synced_at | field("Synced")), "",
+        (.synced_at | synced_field(now)), "",
         ((.title // "" | text) as $title |
             (if ($title | test("^[[:space:]]*$")) then .id | text else $title end) |
             styled("1;36")), "",
@@ -145,15 +201,28 @@ preview_session() {
 }
 
 ui_header() {
-    local mode="${1:?need mode}" archives=hidden
+    local mode="${1:?need mode}" archives=hidden ignored=hidden
     if [[ "$mode" == tmux ]]; then
         printf 'TMUX · ctrl-b Codex\nEnter switch · Tab select\n'
         printf 'ctrl-n new · ctrl-r rename · ctrl-x kill\n'
     else
         archived_visible && archives=shown
-        printf 'CODEX · archives %s · ctrl-b tmux\n' "$archives"
+        ignored_visible && ignored=shown
+        printf 'CODEX · archives %s · ignored %s · ctrl-b tmux\n' "$archives" "$ignored"
         printf 'Enter switch/resume · Tab select\n'
         printf 'ctrl-a archive · ctrl-u unarchive\nctrl-x delete · ctrl-g archived\n'
+        printf 'ctrl-t ignored\n'
+    fi
+}
+
+ui_prompt() {
+    local mode="${1:?need mode}" archived=- ignored=-
+    if [[ "$mode" == codex ]]; then
+        archived_visible && archived=+
+        ignored_visible && ignored=+
+        printf '(%sa %si) ❯ ' "$archived" "$ignored"
+    else
+        printf '❯ '
     fi
 }
 
@@ -165,7 +234,7 @@ session_action() {
         [[ -n "$encoded" ]] || continue
         session="$(decode_session "$encoded")" || return
         if ! jq '{hostname, session_id: .id}' <<<"$session" |
-            "${mode}-agent" "$action" >>"$log_file" 2>&1; then
+            multienv-agent "$mode" "$action" >>"$log_file" 2>&1; then
             show_error "Failed: $action"
             status=1
         fi
@@ -179,7 +248,7 @@ rename_session() {
     IFS= read -r -p 'New session name: ' name </dev/tty || return
     [[ -n "$name" ]] || return 0
     jq --arg name "$name" '{hostname, session_id: .id, new_name: $name}' <<<"$session" |
-        tmux-agent rename-session >>"$log_file" 2>&1 || show_error 'Rename failed'
+        multienv-agent tmux rename-session >>"$log_file" 2>&1 || show_error 'Rename failed'
 }
 
 query_string() {
@@ -200,7 +269,7 @@ query_string() {
 
 create_session() {
     local hosts aliases selected host name
-    hosts="$(tmux-agent list-all 2>>"$log_file" | jq -r 'keys[]')" || return
+    hosts="$(multienv-agent tmux list-all 2>>"$log_file" | jq -r 'keys[]')" || return
     hosts="$(printf '%s\n' "$hosts" "${c_hostnames[@]}" | sed '/^$/d' | sort -u)"
     aliases="$(host_aliases <<<"$hosts")" || return
     selected="$(jq -r 'to_entries[] | [.value, .key] | @tsv' <<<"$aliases" |
@@ -212,7 +281,7 @@ create_session() {
     name="$(query_string 'Session name')" || return
     [[ -n "$name" ]] || return 0
     jq -n --arg host "$host" --arg name "$name" '{hostname: $host, name: $name}' |
-        tmux-agent new-session >>"$log_file" 2>&1 || show_error 'Create failed'
+        multienv-agent tmux new-session >>"$log_file" 2>&1 || show_error 'Create failed'
 }
 
 select_pane() {
@@ -240,7 +309,7 @@ create_codex_pane() {
         --arg name "codex-${id:0:8}" --arg dir "$work_dir" --arg id "$id" \
         '{hostname: $host, session_id: $session, name: $name, work_dir: $dir,
           command: ["multienv-tui", "--resume-when-visible", $id]}' |
-        tmux-agent new-window 2>>"$log_file")" || {
+        multienv-agent tmux new-window 2>>"$log_file")" || {
         show_error 'Failed to create a tmux window'
         return 1
     }
@@ -304,7 +373,7 @@ open_codex_session() {
     host="$(jq -r '.hostname' <<<"$session")"
     id="$(jq -r '.id' <<<"$session")"
     # Refresh before resuming so a stale picker row does not launch another process.
-    session="$(codex-agent list-all 2>>"$log_file" |
+    session="$(multienv-agent codex list-all 2>>"$log_file" |
         jq -e --arg host "$host" --arg id "$id" '.[$host][$id]')" || {
         show_error 'Codex session no longer available'
         return 1
@@ -313,7 +382,7 @@ open_codex_session() {
     if [[ -z "$pane" ]]; then
         session="$(jq -n --arg host "$host" --arg id "$id" \
             '{hostname: $host, session_id: $id}' |
-            codex-agent prepare-resume 2>>"$log_file")" || {
+            multienv-agent codex prepare-resume 2>>"$log_file")" || {
             show_error 'Prepare resume failed'
             return 1
         }
@@ -348,6 +417,11 @@ picker_bindings() {
         done
         bindings+=",ctrl-g:execute-silent($self_command --toggle-archived)"
         bindings+="+transform-header($self_command --header codex)"
+        bindings+="+transform-prompt($self_command --prompt codex)"
+        bindings+="+reload-sync($self_command --list codex)+clear-multi"
+        bindings+=",ctrl-t:execute-silent($self_command --toggle-ignored)"
+        bindings+="+transform-header($self_command --header codex)"
+        bindings+="+transform-prompt($self_command --prompt codex)"
         bindings+="+reload-sync($self_command --list codex)+clear-multi"
     fi
     printf '%s\n' "$bindings"
@@ -355,23 +429,25 @@ picker_bindings() {
 
 run_picker() {
     local mode="${1:?need mode}" query="${2:-}" options keys=ctrl-b
+    local refresh_binding="every(2):reload-sync($self_command --list $mode)"
     local args=()
     options="$(list_options "$mode")" || return
     if [[ "$mode" == tmux ]]; then
         keys+=,ctrl-n
         args+=(--preview-window=hidden)
     else
+        refresh_binding+='+refresh-preview'
         popup_enabled && args+=(--tmux=center,90%,90%)
         args+=(--layout=reverse --tabstop=16)
         args+=(--preview="$self_command --preview {6}")
         args+=(--preview-window='right,50%,border-left,wrap')
     fi
     ui_fzf --ansi --multi --no-select-1 --no-expect --expect="$keys" \
-        --prompt='❯ ' --delimiter=$'\t' --with-nth=1,2,3 --nth=1,2,3 \
+        --prompt="$(ui_prompt "$mode")" --delimiter=$'\t' --with-nth=1,2,3 --nth=1,2,3 \
         --track --id-nth=4,5 --print-query --query="$query" \
         --header="$(ui_header "$mode")" --with-shell="$child_shell" \
         --bind="$(picker_bindings "$mode")" \
-        --bind="every(2):reload-sync($self_command --list $mode)" \
+        --bind="$refresh_binding" \
         "${args[@]}" <<<"$options"
 }
 
@@ -379,9 +455,9 @@ sync_agents() {
     local tmux_pid='' codex_pid='' sleep_pid=''
     trap 'kill "$tmux_pid" "$codex_pid" "$sleep_pid" 2>/dev/null; exit 0' INT TERM
     while true; do
-        tmux-agent sync-all >>"$log_file" 2>&1 &
+        multienv-agent tmux sync-all >>"$log_file" 2>&1 &
         tmux_pid=$!
-        codex-agent sync-all >>"$log_file" 2>&1 &
+        multienv-agent codex sync-all >>"$log_file" 2>&1 &
         codex_pid=$!
         wait "$tmux_pid" "$codex_pid"
         tmux_pid='' codex_pid=''
@@ -404,7 +480,7 @@ main() {
     local mode="${1:-tmux}" selected query key rows encoded status command
     local -A queries=([tmux]='' [codex]='')
     is_in_tmux || die 'Run multienv-tui inside tmux'
-    for command in fzf jq tmux-agent codex-agent; do
+    for command in fzf jq multienv-agent; do
         command -v "$command" >/dev/null || die "Missing command: $command"
     done
     MULTIENV_TUI_STATE_DIR="$(mktemp -d "${TMPDIR:-/tmp}/multienv-tui.XXXXXX")" || return
@@ -482,7 +558,9 @@ dispatch() {
     --list) list_options "${2:?need mode}" "${3:-}" ;;
     --preview) [[ -z "${2:-}" ]] || preview_session "$2" ;;
     --header) ui_header "${2:?need mode}" ;;
+    --prompt) ui_prompt "${2:?need mode}" ;;
     --toggle-archived) toggle_archived ;;
+    --toggle-ignored) toggle_ignored ;;
     --action)
         shift
         session_action "$@"

@@ -20,8 +20,8 @@ func (s Dispatcher) ForwardAgent(
 
 	cmd := subprocess.RemoteCommand{
 		Command: subprocess.Command{
-			Name:  "~/.bin/tmux-agent",
-			Args:  []string{req.Command},
+			Name:  "~/.bin/multienv-agent",
+			Args:  []string{"tmux", req.Command},
 			Stdin: string(input),
 		},
 		Hostname: req.Hostname,

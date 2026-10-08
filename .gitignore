@@ -4,6 +4,7 @@
 /dist/
 /cmd
 /multienv-server
+/multienv-agent
 *.exe
 *.test
 /go.work
