@@ -20,6 +20,7 @@ func ListSessions(ctx context.Context) (model.SessionsById, error) {
 	cmd := subprocess.Command{
 		Name: "tmux",
 		Args: []string{
+			"-u", // Preserve tabs and Unicode in the output even without a UTF-8 locale.
 			"list-sessions",
 			"-F",
 			sessionFormat,
@@ -42,6 +43,18 @@ func ListSessions(ctx context.Context) (model.SessionsById, error) {
 			return nil, err
 		}
 		sessions[session.Id] = session
+	}
+
+	windows, err := listWindows(ctx, "")
+	if err != nil {
+		return nil, err
+	}
+
+	for id, session := range sessions {
+		if list, ok := windows[id]; ok {
+			session.Windows = list
+			sessions[id] = session
+		}
 	}
 
 	return sessions, nil
@@ -68,6 +81,7 @@ func parseSession(line string, syncedAt time.Time) (model.Session, error) {
 		Id:             fields[0],
 		Name:           fields[1],
 		WindowCount:    windowCount,
+		Windows:        []model.Window{},
 		Attached:       attached,
 		LastAttached:   lastAttached,
 		CurrentCommand: fields[5],

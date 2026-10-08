@@ -4,6 +4,7 @@
 
 ```sh
 multienv-agent tmux list-all
+multienv-agent tmux list-local
 multienv-agent tmux sync-all
 multienv-agent codex list-all
 multienv-agent codex sync-all
@@ -12,6 +13,10 @@ printf '%s\n' '{"target":"https://example.com"}' | multienv-agent master open
 ```
 
 The tmux and Codex trees retain their own session operations and synchronization commands.
+`tmux list-local` returns local sessions keyed by session ID without contacting
+the server. Each session includes its windows, with their IDs, indices, names,
+active flags, and the commands and directories of their active panes. The agent
+uses one `list-sessions` call and one `list-windows -a` call per snapshot.
 The master tree executes commands on the server host. `show-notification` reads
 a notification object from stdin: only `text` is required; `title`, `subtitle`,
 and `sound_name` are optional. Successful notification commands produce no output.

@@ -59,3 +59,14 @@ the attachment indicator, including for detached sessions. Indicators refresh
 every two seconds. Each row also shows the window count, command and directory
 of the active pane in the active window. Home directories are abbreviated to
 `~`, and long paths are shortened to their last 47 characters with a leading `…`.
+
+The right pane shows the selected tmux session's windows, ordered by index,
+with their names, commands and directories. A green `●` marks the active window.
+Each window occupies one line; the command is omitted when it matches the window
+name. Lines wider than the pane are truncated.
+Press **Ctrl-L** to focus the windows on the right without changing the session
+list, its selection or search query. Use **j/k**, arrow keys or **Ctrl-J/Ctrl-K**
+to select a window, then **Enter** to switch directly to it. **Ctrl-H** or **Esc**
+returns to session selection. The windows refresh every two seconds. **Enter**
+in the session list still switches to the session's active window. Session
+management shortcuts are disabled while the windows have focus.

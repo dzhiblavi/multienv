@@ -13,7 +13,7 @@ func NewSession(ctx context.Context, name string) (model.Session, error) {
 	cmd := subprocess.Command{
 		Name: "tmux",
 		Args: []string{
-			"new-session", "-d",
+			"-u", "new-session", "-d",
 			"-s", name,
 			"-P", "-F", sessionFormat,
 		},
@@ -24,5 +24,19 @@ func NewSession(ctx context.Context, name string) (model.Session, error) {
 		return model.Session{}, err
 	}
 
-	return parseSession(strings.TrimSuffix(result.Stdout, "\n"), time.Now())
+	session, err := parseSession(strings.TrimSuffix(result.Stdout, "\n"), time.Now())
+	if err != nil {
+		return model.Session{}, err
+	}
+
+	windows, err := listWindows(ctx, session.Id)
+	if err != nil {
+		return model.Session{}, err
+	}
+
+	if list, ok := windows[session.Id]; ok {
+		session.Windows = list
+	}
+
+	return session, nil
 }

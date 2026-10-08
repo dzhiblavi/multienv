@@ -125,6 +125,11 @@ ui_jq_helpers() {
             if $synced != null and $now - $synced > 30 then "!" | styled("31")
             elif (.attached // 0) > 0 then "●" | styled("32")
             else " " end;
+        def window_label:
+            (.name | text) as $name |
+            [((if .active then "●" | styled("32") else " " end) + " \(.index): " + $name),
+             (.current_command // "" | text | select(length > 0 and . != $name)),
+             (.current_path // "" | short_path | select(length > 0))] | join(" · ");
         def display_state:
             if .state == "Working" and (.tmux_pane_id // "") == "" then
                 "Working (bg)"
@@ -191,6 +196,86 @@ decode_session() {
     jq -Rer '@base64d | fromjson' <<<"${1:?need session}"
 }
 
+preview_tmux_windows() {
+    local session selection=null
+    session="$(decode_session "${1:?need session}")" || return
+    tmux_window_focused && selection="$(cat "${MULTIENV_TUI_STATE_DIR}/tmux-window")"
+    jq -r --argjson selection "$selection" "$(ui_jq_helpers)"'
+        (.windows // [] | sort_by(.index)) as $windows |
+        (if $selection == null then null else
+            ($windows | map(.id) | index($selection.window_id)) //
+            ($windows | map(.active) | index(true)) // 0
+         end) as $cursor |
+        (.name | text | styled("1;36")),
+        (if $selection == null then "ctrl-l select windows" else "ctrl-h sessions · j/k move · Enter switch" end |
+            styled("90")), "",
+        if (.windows // [] | length) == 0 then "No windows available" else
+            $windows | to_entries[] |
+            (if .key == $cursor then
+                ("> " + (.value | window_label) | gsub("\u001b\\[[0-9;]*m"; "")) | styled("1;7")
+             else "  " + (.value | window_label) end)
+        end
+    ' <<<"$session"
+}
+
+tmux_window_focused() {
+    [[ -n "${MULTIENV_TUI_STATE_DIR:-}" && -f "${MULTIENV_TUI_STATE_DIR}/tmux-window" ]]
+}
+
+update_tmux_window() {
+    local encoded="${1:?need session}" delta="${2:-0}" selection=null session state_file
+    state_file="${MULTIENV_TUI_STATE_DIR:?need UI state}/tmux-window"
+    tmux_window_focused && selection="$(cat "$state_file")"
+    session="$(decode_session "$encoded")" || return
+    jq -e --argjson selection "$selection" --argjson delta "$delta" '
+        . as $session | .windows // [] | sort_by(.index) |
+        select(length > 0) | . as $windows |
+        (if $selection.hostname == $session.hostname and $selection.session_id == $session.id then
+            map(.id) | index($selection.window_id)
+         else null end) as $previous |
+        ($previous // (map(.active) | index(true)) // 0) as $index |
+        ([$index + $delta, 0] | max | [., ($windows | length) - 1] | min) as $next |
+        {hostname: $session.hostname, session_id: $session.id, window_id: $windows[$next].id,
+         line: ($next + 4)}
+    ' <<<"$session" >"$state_file.next" || return
+    mv "$state_file.next" "$state_file"
+}
+
+focus_tmux_windows() {
+    [[ -n "${1:-}" ]] && update_tmux_window "$1" || return
+    printf 'disable-search+unbind(ctrl-x,ctrl-r,ctrl-n,ctrl-p,tab,btab,alt-up,alt-down)+'
+    printf 'change-preview-window(+%s/2)+refresh-preview\n' \
+        "$(jq -r '.line' "${MULTIENV_TUI_STATE_DIR}/tmux-window")"
+}
+
+blur_tmux_windows() {
+    if ! tmux_window_focused; then
+        printf '%s\n' "${1:-ignore}"
+        return
+    fi
+    rm -f "${MULTIENV_TUI_STATE_DIR}/tmux-window"
+    printf 'enable-search+rebind(ctrl-x,ctrl-r,ctrl-n,ctrl-p,tab,btab,alt-up,alt-down)+'
+    printf 'change-preview-window(+0)+refresh-preview\n'
+}
+
+move_tmux_window() {
+    local delta="${1:?need direction}" fallback="${2:?need fallback}" encoded="${3:-}"
+    if ! tmux_window_focused; then
+        printf '%s\n' "$fallback"
+        return
+    fi
+    [[ -n "$encoded" ]] && update_tmux_window "$encoded" "$delta" || return
+    printf 'change-preview-window(+%s/2)+refresh-preview\n' \
+        "$(jq -r '.line' "${MULTIENV_TUI_STATE_DIR}/tmux-window")"
+}
+
+accept_tmux_session() {
+    if tmux_window_focused; then
+        [[ -n "${1:-}" ]] && update_tmux_window "$1" || return
+    fi
+    printf 'clear-multi+accept\n'
+}
+
 preview_session() {
     local session host
     session="$(decode_session "${1:-}")" || return
@@ -218,7 +303,8 @@ preview_session() {
 ui_header() {
     local mode="${1:?need mode}" archives=hidden ignored=hidden
     if [[ "$mode" == tmux ]]; then
-        printf 'TMUX · ctrl-b Codex\nEnter switch · Tab select\n'
+        printf 'TMUX · ctrl-b Codex\nEnter switch · ctrl-l windows · ctrl-h sessions\n'
+        printf 'Tab select sessions · j/k move in windows\n'
         printf 'ctrl-n new · ctrl-r rename · ctrl-x kill\n'
     else
         archived_visible && archives=shown
@@ -413,13 +499,29 @@ open_codex_session() {
 picker_bindings() {
     local mode="${1:?need mode}" bindings
     bindings='start:hide-header,?:toggle-header'
-    bindings+=',enter:clear-multi+accept,double-click:clear-multi+accept'
     if [[ "$mode" == tmux ]]; then
+        bindings+=",enter:transform($self_command --accept-tmux {6})"
+        bindings+=",double-click:transform($self_command --accept-tmux {6})"
+        bindings+=",ctrl-l:transform($self_command --focus-windows {6})"
+        bindings+=",ctrl-h:transform($self_command --blur-windows)"
+        bindings+=",esc:transform($self_command --blur-windows abort)"
+        local key fallback
+        for key in up ctrl-k k; do
+            fallback=up
+            [[ "$key" == k ]] && fallback='put(k)'
+            bindings+=",$key:transform($self_command --move-window -1 '$fallback' {6})"
+        done
+        for key in down ctrl-j j; do
+            fallback=down
+            [[ "$key" == j ]] && fallback='put(j)'
+            bindings+=",$key:transform($self_command --move-window 1 '$fallback' {6})"
+        done
         bindings+=",ctrl-x:execute-silent($self_command --action tmux kill-session {+6})"
         bindings+="+reload-sync($self_command --list tmux)+clear-multi"
         bindings+=",ctrl-r:execute($self_command --rename {6})"
         bindings+="+reload-sync($self_command --list tmux)+clear-multi"
     else
+        bindings+=',enter:clear-multi+accept,double-click:clear-multi+accept'
         local key action
         for key in ctrl-a ctrl-u ctrl-x; do
             case "$key" in
@@ -444,12 +546,17 @@ picker_bindings() {
 
 run_picker() {
     local mode="${1:?need mode}" query="${2:-}" options keys=ctrl-b
-    local refresh_binding="every(2):reload-sync($self_command --list $mode)"
+    local refresh_binding="every(3):reload-sync($self_command --list $mode)"
     local args=()
     options="$(list_options "$mode")" || return
     if [[ "$mode" == tmux ]]; then
+        rm -f "${MULTIENV_TUI_STATE_DIR:?need UI state}/tmux-window"
         keys+=,ctrl-n
-        args+=(--preview-window=hidden --no-sort)
+        popup_enabled && args+=(--tmux=center,90%,90%)
+        args+=(--layout=reverse --no-sort)
+        args+=(--preview="$self_command --preview-tmux-windows {6}")
+        args+=(--preview-window='right,50%,border-left,nowrap,~3')
+        refresh_binding+='+refresh-preview'
     else
         refresh_binding+='+refresh-preview'
         popup_enabled && args+=(--tmux=center,90%,90%)
@@ -530,6 +637,13 @@ main() {
                 open_codex_session "$encoded" && return 0
             else
                 selected="$(decode_session "$encoded")" || return
+                if tmux_window_focused; then
+                    selected="$(jq -e --slurpfile window "${MULTIENV_TUI_STATE_DIR}/tmux-window" '
+                        . as $session | $window[0] |
+                        select(.hostname == $session.hostname and .session_id == $session.id) |
+                        $session + {id: (.session_id + ":" + .window_id)}
+                    ' <<<"$selected")" || continue
+                fi
                 select_session "$(jq -r '.hostname' <<<"$selected")" \
                     "$(jq -r '.id' <<<"$selected")" && return 0
             fi
@@ -572,6 +686,11 @@ dispatch() {
     case "${1:-tmux}" in
     --list) list_options "${2:?need mode}" "${3:-}" ;;
     --preview) [[ -z "${2:-}" ]] || preview_session "$2" ;;
+    --preview-tmux-windows) [[ -z "${2:-}" ]] || preview_tmux_windows "$2" ;;
+    --focus-windows) focus_tmux_windows "${2:-}" ;;
+    --blur-windows) blur_tmux_windows "${2:-ignore}" ;;
+    --move-window) move_tmux_window "${2:?need direction}" "${3:?need fallback}" "${4:-}" ;;
+    --accept-tmux) accept_tmux_session "${2:-}" ;;
     --header) ui_header "${2:?need mode}" ;;
     --prompt) ui_prompt "${2:?need mode}" ;;
     --toggle-archived) toggle_archived ;;
