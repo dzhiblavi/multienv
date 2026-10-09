@@ -320,6 +320,9 @@ Enter always opens just the current item. `?` toggles the help header. Ctrl-B sw
 to the optional Codex view and back; Esc closes the dashboard when the session list has focus.
 The list and preview refresh every three seconds; synchronization runs in the
 background while the dashboard is open.
+Search matches only the session name (or the title in Codex mode) and the displayed host.
+Ctrl-V toggles searching all visible fields, including the tmux command and directory;
+the prompt shows `[all]` while this mode is active. Press Ctrl-V again to return to name and host search.
 
 If tmux consumes Ctrl-B as its prefix, use its send-prefix binding to pass that key
 to the dashboard; with the default bindings, press Ctrl-B twice.
@@ -342,6 +345,7 @@ active pane. Home paths are shortened to `~`; long paths show their trailing por
 | j/k, arrows, Ctrl-J/Ctrl-K in the window list | Choose a window |
 | Enter in the window list | Switch directly to the chosen window |
 | Ctrl-H or Esc in the window list | Return focus to the sessions |
+| Ctrl-V in the session list | Toggle name/host search and search across all visible fields |
 | Ctrl-N | Create a session; choose its host and name |
 | Ctrl-R | Rename the current session |
 | Ctrl-X | Kill marked sessions, or the current session if none are marked |
@@ -377,6 +381,7 @@ active work without a mapped tmux pane. Snapshot ages over 10 seconds are red.
 | Ctrl-X | Delete marked sessions, or the current session |
 | Ctrl-G | Show or hide archived sessions |
 | Ctrl-T | Show or hide sessions matching the ignore file |
+| Ctrl-V | Toggle title/host search and search across all visible fields |
 
 When a session needs resuming, choose a tmux session on its host and Multienv creates
 a window for it. With `--no-popup`, resuming a local session replaces the dashboard
