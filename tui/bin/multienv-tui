@@ -120,10 +120,10 @@ ui_jq_helpers() {
                 ("Synced: " | styled("90")) +
                 ($age | elapsed | styled(if $age > 10 then "1;31" else "90" end))
             end;
-        def tmux_indicator($now):
+        def session_indicator($now; $active):
             ((try (.synced_at // "" | sync_epoch) catch null) // null) as $synced |
             if $synced != null and $now - $synced > 30 then "!" | styled("31")
-            elif (.attached // 0) > 0 then "●" | styled("32")
+            elif $active then "●" | styled("32")
             else " " end;
         def window_label:
             (.name | text) as $name |
@@ -176,19 +176,22 @@ list_options() {
         . as $session |
         (if $mode == "tmux" then .name else .title end) as $title |
         (if ($title // "") == "" then .id else $title end | text) as $label |
-        (if $mode == "tmux" then
-            [(tmux_indicator($now) + " " + $label),
+        ((if $mode == "tmux" then
+            [(session_indicator($now; (.attached // 0) > 0) + " " + $label),
              $aliases[$host],
              (["\(.window_count) windows",
                (.current_command // "" | text | select(length > 0)),
                (.current_path // "" | short_path | select(length > 0))] | join(" · "))]
          else
             [colored_state, $aliases[$host], $label]
-         end) + [$host, .id, ($session | tojson | @base64)] | @tsv |
-        . as $row |
-        (gsub("\u001b\\[[0-9;]*m"; "")) as $plain_row |
+         end) + [$host, .id, ($session | tojson | @base64)]) as $fields |
+        # Ignore rules use the original status column, without the activity indicator.
+        ($fields | @tsv | gsub("\u001b\\[[0-9;]*m"; "")) as $plain_row |
         select(any($patterns[]; . as $pattern | $plain_row | test($pattern)) | not) |
-        $row
+        if $mode == "codex" then
+            ($session | session_indicator($now; (.tmux_pane_id // "") != "")) as $indicator |
+            $fields | .[0] = ($indicator + " " + .[0]) | @tsv
+        else $fields | @tsv end
     ' <<<"$sessions"
 }
 

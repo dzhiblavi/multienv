@@ -369,9 +369,11 @@ Install the Codex dependencies above on those hosts. The integration uses the sa
 agent, SSH connections and tmux sessions as the main workspace. Press Ctrl-B in the
 dashboard, or start with `multienv-tui codex`, to open the conversation view.
 
-The list shows state, host and conversation title. The preview includes the working
-directory, first and latest messages, and snapshot age. `Working (bg)` identifies
-active work without a mapped tmux pane. Snapshot ages over 10 seconds are red.
+The list shows an activity indicator, state, host and conversation title. A green `●`
+means the session has a mapped tmux pane. A red `!` means the snapshot is older than
+30 seconds and takes precedence over the dot. `Working (bg)` identifies active work
+without a mapped tmux pane. The preview includes the working directory, first and
+latest messages, and snapshot age. Snapshot ages over 10 seconds are red in the preview.
 
 | Key | Action |
 | --- | --- |
@@ -404,9 +406,11 @@ whitespace and `#` are comments. Rules are reread on refresh. For example:
 ^[^\t]*\t[^\t]*\tscratch:
 ```
 
-Rules match the full row with colors removed; its first three tab-separated fields
-are state, host alias and title. They can also match the hostname, ID and encoded
-session data that follow. Use anchors to target the visible fields.
+Rules match the full row with colors and the activity indicator removed; its first
+three tab-separated fields are state, host alias and title. Existing rules such as
+`^Working \(bg\)\t` still work, regardless of the dot or stale warning. Rules can also
+match the hostname, ID and encoded session data that follow. Use anchors to target
+the visible fields.
 
 Override the ignore file or shell log path in `tui.sh`:
 
