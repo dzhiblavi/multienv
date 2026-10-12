@@ -337,6 +337,9 @@ active pane. Home paths are shortened to `~`; long paths show their trailing por
 - A red `!` means the snapshot is older than 30 seconds and takes precedence over the dot.
 - The right pane lists windows by index, one line each, with a green dot on the active
   window. The command is omitted when it matches the window name.
+- For local sessions, the active pane's contents appear below the window list. The
+  preview follows the selected window when the window list has focus and refreshes
+  every three seconds.
 
 | Key | Action |
 | --- | --- |

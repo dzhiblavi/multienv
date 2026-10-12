@@ -218,7 +218,26 @@ preview_tmux_windows() {
                 ("> " + (.value | window_label) | gsub("\u001b\\[[0-9;]*m"; "")) | styled("1;7")
              else "  " + (.value | window_label) end)
         end
-    ' <<<"$session"
+    ' <<<"$session" || return
+    preview_tmux_window_pane "$session" "$selection"
+}
+
+preview_tmux_window_pane() {
+    local session="${1:?need session}" selection="${2:-null}" target
+    is_on_hostname "$(jq -r '.hostname' <<<"$session")" || return 0
+
+    target="$(jq -r --argjson selection "$selection" '
+        . as $session | (.windows // [] | sort_by(.index)) as $windows |
+        (if $selection.hostname == .hostname and $selection.session_id == .id then
+            $windows | map(select(.id == $selection.window_id)) | .[0]
+         else null end) // ($windows | map(select(.active)) | .[0]) // $windows[0] |
+        $session.id + ":" + (.id // "")
+    ' <<<"$session")" || return
+
+    printf '\n\033[90mPane preview\033[0m\n\n'
+    if ! tmux capture-pane -p -e -t "$target" 2>>"$log_file"; then
+        printf '\033[90mPane preview unavailable\033[0m\n'
+    fi
 }
 
 tmux_window_focused() {
