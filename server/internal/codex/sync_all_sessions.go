@@ -18,7 +18,8 @@ func (s Dispatcher) SyncAllSessions(
 		wg.Add(1)
 
 		go func(host string) {
-			log.Info(ctx, "syncing host", "dispatcher", "codex", "host", host)
+			ctx := log.WithCustomLogData(ctx, "host", host)
+			log.Info(ctx, "syncing host")
 
 			req := operations.ForwardAgentRequest{
 				Hostname: host,
@@ -27,8 +28,7 @@ func (s Dispatcher) SyncAllSessions(
 
 			_, err := s.ForwardAgent(ctx, req)
 			if err != nil {
-				log.Error(ctx, "failed to sync host", "dispatcher", "codex",
-					"host", host, "error", err)
+				log.Error(ctx, "failed to sync host", "error", err)
 			}
 
 			wg.Done()

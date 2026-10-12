@@ -7,22 +7,13 @@ import (
 	"multienv/common/log"
 )
 
-func logCommand(ctx context.Context, command Command) {
-	log.Info(ctx, "starting subprocess", "command", command.Name, "args", command.Args)
-}
-
 func logCommandResult(
 	ctx context.Context,
-	command Command,
 	result RunResult,
 	err error,
 	elapsed time.Duration,
 ) {
-	args := []any{
-		"command", command.Name,
-		"args", command.Args,
-		"exec_sec", elapsed.Seconds(),
-	}
+	args := []any{"exec_sec", elapsed.Seconds()}
 
 	if err != nil {
 		args = append(args, "error", err)

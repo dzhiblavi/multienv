@@ -22,8 +22,9 @@ func (s Dispatcher) Dispatch(ctx context.Context, payload string) (any, error) {
 		return nil, fmt.Errorf("decode operation: %w: %w", dispatcher.ErrInvalidParams, err)
 	}
 
-	log.Info(ctx, "dispatch", "dispatcher", "master", "action", env.Action)
 	log.AddCustomLogData(ctx, "action", env.Action)
+	log.AddCustomLogData(ctx, "dispatcher", "master")
+	log.Info(ctx, "dispatch")
 
 	switch env.Action {
 	case "open":

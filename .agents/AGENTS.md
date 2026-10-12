@@ -3,6 +3,7 @@
 ## Code
 
 - Do not add tests.
+- Do not add useless comments. Function and variable names should be self-explanatory.
 - Keep every line added or changed by the agent in its diff at or below 120 characters.
 - Write small functions, each with one clear responsibility.
 - Separate logical blocks of code with blank lines.

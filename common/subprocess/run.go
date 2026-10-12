@@ -10,13 +10,18 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+
+	"multienv/common/log"
 )
 
 func Run(ctx context.Context, command Command) (result RunResult, runErr error) {
+	ctx = log.WithCustomLogData(ctx, "command", command.Name)
+	ctx = log.WithCustomLogData(ctx, "args", command.Args)
+
 	start := time.Now()
-	logCommand(ctx, command)
+	log.Info(ctx, "starting subprocess")
 	defer func() {
-		logCommandResult(ctx, command, result, runErr, time.Since(start))
+		logCommandResult(ctx, result, runErr, time.Since(start))
 	}()
 
 	name, err := expandCommandName(command.Name)

@@ -1,6 +1,5 @@
 package model
 
-// osascript -e 'display notification "The backup script finished successfully." with title "Backup Status" subtitle "Success" sound name "Glass"'
 type Notification struct {
 	Text      string `json:"text"`
 	Title     string `json:"title,omitempty"`

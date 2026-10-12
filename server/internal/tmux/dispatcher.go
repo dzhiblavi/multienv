@@ -26,8 +26,9 @@ func (s Dispatcher) Dispatch(ctx context.Context, payload string) (any, error) {
 		return "", err
 	}
 
-	log.Info(ctx, "dispatch", "dispatcher", "tmux", "action", env.Action)
 	log.AddCustomLogData(ctx, "action", env.Action)
+	log.AddCustomLogData(ctx, "dispatcher", "tmux")
+	log.Info(ctx, "dispatch")
 
 	switch env.Action {
 	case "list-all":

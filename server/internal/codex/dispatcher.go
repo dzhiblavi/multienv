@@ -26,7 +26,9 @@ func (s Dispatcher) Dispatch(ctx context.Context, payload string) (any, error) {
 		return "", err
 	}
 
-	log.Info(ctx, "dispatch", "dispatcher", "codex", "action", env.Action)
+	log.AddCustomLogData(ctx, "action", env.Action)
+	log.AddCustomLogData(ctx, "dispatcher", "codex")
+	log.Info(ctx, "dispatch")
 
 	switch env.Action {
 	case "list-all":

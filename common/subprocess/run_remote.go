@@ -3,9 +3,13 @@ package subprocess
 import (
 	"context"
 	"os"
+
+	"multienv/common/log"
 )
 
 func RunRemote(ctx context.Context, command RemoteCommand) (RunResult, error) {
+	ctx = log.WithCustomLogData(ctx, "host", command.Hostname)
+
 	hostname, err := os.Hostname()
 	if err != nil {
 		return RunResult{}, err

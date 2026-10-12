@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"log/slog"
+	"maps"
 	"sync"
 )
 
@@ -60,6 +61,18 @@ func AddCustomLogData(ctx context.Context, key string, value any) {
 	data.mu.Lock()
 	defer data.mu.Unlock()
 	data.values[key] = value
+}
+
+func WithCustomLogData(ctx context.Context, key string, value any) context.Context {
+	data := &customLogData{values: make(map[string]any)}
+	if parent := getCustomLogData(ctx); parent != nil {
+		parent.mu.RLock()
+		maps.Copy(data.values, parent.values)
+		parent.mu.RUnlock()
+	}
+
+	data.values[key] = value
+	return context.WithValue(ctx, customLogDataKey, data)
 }
 
 func getCustomLogData(ctx context.Context) *customLogData {
