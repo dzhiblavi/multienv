@@ -195,6 +195,17 @@ list_options() {
     ' <<<"$sessions"
 }
 
+refresh_list() {
+    local mode="${1:?need mode}" snapshot
+    snapshot="$(mktemp "${MULTIENV_TUI_STATE_DIR:?need UI state}/$mode-list.XXXXXX")" || return
+    if ! list_options "$mode" >"$snapshot" 2>>"$log_file"; then
+        rm -f "$snapshot"
+        return 0
+    fi
+
+    printf 'reload-sync(cat %q; rm -f %q)+refresh-preview\n' "$snapshot" "$snapshot"
+}
+
 decode_session() {
     jq -Rer '@base64d | fromjson' <<<"${1:?need session}"
 }
@@ -541,9 +552,9 @@ picker_bindings() {
             bindings+=",$key:transform($self_command --move-window 1 '$fallback' {6})"
         done
         bindings+=",ctrl-x:execute-silent($self_command --action tmux kill-session {+6})"
-        bindings+="+reload-sync($self_command --list tmux)+clear-multi"
+        bindings+="+bg-cancel+clear-multi+bg-transform($self_command --refresh-list tmux)"
         bindings+=",ctrl-r:execute($self_command --rename {6})"
-        bindings+="+reload-sync($self_command --list tmux)+clear-multi"
+        bindings+="+bg-cancel+clear-multi+bg-transform($self_command --refresh-list tmux)"
     else
         bindings+=',enter:clear-multi+accept,double-click:clear-multi+accept'
         local key action
@@ -554,23 +565,23 @@ picker_bindings() {
             ctrl-x) action=delete-session ;;
             esac
             bindings+=",$key:execute-silent($self_command --action codex $action {+6})"
-            bindings+="+reload-sync($self_command --list codex)+clear-multi"
+            bindings+="+bg-cancel+clear-multi+bg-transform($self_command --refresh-list codex)"
         done
         bindings+=",ctrl-g:execute-silent($self_command --toggle-archived)"
         bindings+="+transform-header($self_command --header codex)"
         bindings+="+transform-prompt($self_command --prompt codex)"
-        bindings+="+reload-sync($self_command --list codex)+clear-multi"
+        bindings+="+bg-cancel+clear-multi+bg-transform($self_command --refresh-list codex)"
         bindings+=",ctrl-t:execute-silent($self_command --toggle-ignored)"
         bindings+="+transform-header($self_command --header codex)"
         bindings+="+transform-prompt($self_command --prompt codex)"
-        bindings+="+reload-sync($self_command --list codex)+clear-multi"
+        bindings+="+bg-cancel+clear-multi+bg-transform($self_command --refresh-list codex)"
     fi
     printf '%s\n' "$bindings"
 }
 
 run_picker() {
     local mode="${1:?need mode}" query="${2:-}" options keys=ctrl-b search_fields=1,2
-    local refresh_binding="every(3):reload-sync($self_command --list $mode)"
+    local refresh_binding="every(3):bg-transform($self_command --refresh-list $mode)"
     local args=()
     options="$(list_options "$mode")" || return
     if [[ "$mode" == tmux ]]; then
@@ -580,10 +591,8 @@ run_picker() {
         args+=(--layout=reverse --no-sort)
         args+=(--preview="$self_command --preview-tmux-windows {6}")
         args+=(--preview-window='right,50%,border-left,nowrap,~3')
-        refresh_binding+='+refresh-preview'
     else
         search_fields=2,3
-        refresh_binding+='+refresh-preview'
         popup_enabled && args+=(--tmux=center,90%,90%)
         args+=(--layout=reverse --tabstop=16)
         args+=(--preview="$self_command --preview {6}")
@@ -711,6 +720,7 @@ start_ui() {
 dispatch() {
     case "${1:-tmux}" in
     --list) list_options "${2:?need mode}" "${3:-}" ;;
+    --refresh-list) refresh_list "${2:?need mode}" ;;
     --preview) [[ -z "${2:-}" ]] || preview_session "$2" ;;
     --preview-tmux-windows) [[ -z "${2:-}" ]] || preview_tmux_windows "$2" ;;
     --focus-windows) focus_tmux_windows "${2:-}" ;;

@@ -318,8 +318,7 @@ Run the dashboard inside tmux. Type to search, use arrow keys or Ctrl-J/Ctrl-K t
 move, and press Enter to open the current item. Tab marks sessions for batch actions;
 Enter always opens just the current item. `?` toggles the help header. Ctrl-B switches
 to the optional Codex view and back; Esc closes the dashboard when the session list has focus.
-The list and preview refresh every three seconds; synchronization runs in the
-background while the dashboard is open.
+The list and preview refresh every three seconds.
 Search matches only the session name (or the title in Codex mode) and the displayed host.
 Ctrl-V toggles searching all visible fields, including the tmux command and directory;
 the prompt shows `[all]` while this mode is active. Press Ctrl-V again to return to name and host search.
