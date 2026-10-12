@@ -407,10 +407,9 @@ whitespace and `#` are comments. Rules are reread on refresh. For example:
 ```
 
 Rules match the full row with colors and the activity indicator removed; its first
-three tab-separated fields are state, host alias and title. Existing rules such as
-`^Working \(bg\)\t` still work, regardless of the dot or stale warning. Rules can also
-match the hostname, ID and encoded session data that follow. Use anchors to target
-the visible fields.
+three tab-separated fields are state, host alias and title. Rules can also match the
+hostname, ID and encoded session data that follow. Use anchors to target the visible
+fields.
 
 Override the ignore file or shell log path in `tui.sh`:
 
