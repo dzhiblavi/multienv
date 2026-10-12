@@ -234,7 +234,7 @@ preview_tmux_windows() {
 }
 
 preview_tmux_window_pane() {
-    local session="${1:?need session}" selection="${2:-null}" target
+    local session="${1:?need session}" selection="${2:-null}" target separator
     is_on_hostname "$(jq -r '.hostname' <<<"$session")" || return 0
 
     target="$(jq -r --argjson selection "$selection" '
@@ -245,7 +245,8 @@ preview_tmux_window_pane() {
         $session.id + ":" + (.id // "")
     ' <<<"$session")" || return
 
-    printf '\n\033[90mPane preview\033[0m\n\n'
+    printf -v separator '%*s' "${FZF_PREVIEW_COLUMNS:-80}" ''
+    printf '\n\033[90m%s\nPane preview\033[0m\n\n' "${separator// /─}"
     if ! tmux capture-pane -p -e -t "$target" 2>>"$log_file"; then
         printf '\033[90mPane preview unavailable\033[0m\n'
     fi
