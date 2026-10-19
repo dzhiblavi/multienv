@@ -70,26 +70,39 @@ func (s *redisStorage) Get(ctx context.Context, path string, dst any) error {
 }
 
 func (s *redisStorage) Set(ctx context.Context, path string, value any) error {
-	repr, err := json.Marshal(value)
-	if err != nil {
-		return err
-	}
-
-	return s.client.JSONSet(ctx, s.key, path, repr).Err()
+	return s.set(ctx, path, value, "")
 }
 
 func (s *redisStorage) SetIfAbsent(ctx context.Context, path string, value any) error {
-	repr, err := json.Marshal(value)
-	if err != nil {
-		return err
-	}
-
-	err = s.client.JSONSetMode(ctx, s.key, path, repr, "NX").Err()
+	err := s.set(ctx, path, value, "NX")
 	if errors.Is(err, redis.Nil) {
 		return nil
 	}
 
 	return err
+}
+
+func (s *redisStorage) set(ctx context.Context, path string, value any, mode string) error {
+	repr, err := json.Marshal(value)
+	if err != nil {
+		return err
+	}
+
+	if path == "$" || path == "." {
+		return s.client.JSONSetMode(ctx, s.key, path, repr, mode).Err()
+	}
+
+	var result *redis.StatusCmd
+	_, err = s.client.TxPipelined(ctx, func(pipe redis.Pipeliner) error {
+		pipe.JSONSetMode(ctx, s.key, "$", "{}", "NX")
+		result = pipe.JSONSetMode(ctx, s.key, path, repr, mode)
+		return nil
+	})
+	if err != nil && !errors.Is(err, redis.Nil) {
+		return err
+	}
+
+	return result.Err()
 }
 
 func (s *redisStorage) Delete(ctx context.Context, path string) error {
