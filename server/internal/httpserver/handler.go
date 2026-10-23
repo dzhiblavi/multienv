@@ -9,8 +9,6 @@ import (
 	"multienv/server/internal/dispatcher"
 )
 
-type handlerFunc func(http.ResponseWriter, *http.Request)
-
 func makeHandler(disp dispatcher.Dispatcher) http.HandlerFunc {
 	handler := func(w http.ResponseWriter, r *http.Request) {
 		handler(disp, w, r)
@@ -24,8 +22,6 @@ func handler(
 	w http.ResponseWriter,
 	r *http.Request,
 ) {
-	ctx := r.Context()
-
 	w.Header().Set("Content-Type", "application/json")
 	defer r.Body.Close()
 
@@ -36,7 +32,24 @@ func handler(
 		return
 	}
 
-	resp, err := disp.Dispatch(ctx, string(bodyBytes))
+	dispatch(disp, w, r, string(bodyBytes))
+}
+
+func makeQueryHandler(disp dispatcher.Dispatcher) http.HandlerFunc {
+	return AccessLogMiddleware()(func(w http.ResponseWriter, r *http.Request) {
+		payload, _ := json.Marshal(struct {
+			Action  string   `json:"action"`
+			Request struct{} `json:"request"`
+		}{Action: r.PathValue("action")})
+
+		dispatch(disp, w, r, string(payload))
+	})
+}
+
+func dispatch(disp dispatcher.Dispatcher, w http.ResponseWriter, r *http.Request, payload string) {
+	w.Header().Set("Content-Type", "application/json")
+
+	resp, err := disp.Dispatch(r.Context(), payload)
 	if err != nil {
 		w.WriteHeader(httpCodeForError(err))
 		json.NewEncoder(w).Encode(dispatcher.Response{Error: err})

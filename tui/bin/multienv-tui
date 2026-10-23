@@ -2,20 +2,44 @@
 
 ensure_bash() {
     ((BASH_VERSINFO[0] >= 4)) && return
-    local candidate
-    for candidate in /opt/homebrew/bin/bash /usr/local/bin/bash; do
-        [[ -x "$candidate" ]] && exec "$candidate" "$0" "$@"
-    done
-    printf 'multienv-tui requires Bash 4 or newer\n' >&2
+
+    printf 'multienv-tui requires Bash 4 or newer first in PATH\n' >&2
     exit 1
 }
 
-ensure_bash "$@"
+run_doctor() {
+    local script="${BASH_SOURCE[0]}" directory target
+    [[ "$script" == */* ]] || script="./$script"
+
+    while [[ -L "$script" ]]; do
+        directory="${script%/*}"
+        target="$(readlink "$script")" || return
+        if [[ "$target" == /* ]]; then
+            script="$target"
+        else
+            script="$directory/$target"
+        fi
+    done
+
+    directory="${script%/*}"
+    source "$directory/../lib/doctor.sh" || return
+
+    tui_doctor "$@"
+}
+
+if [[ "${1:-}" == --doctor ]]; then
+    shift
+    run_doctor "$@"
+    exit $?
+fi
+
+ensure_bash
 set -o pipefail
 
 script_dir="$(cd "$(dirname "$(realpath "${BASH_SOURCE[0]}")")" && pwd)"
 source "${script_dir}/../lib/prelude.sh"
 source "${script_dir}/../lib/select.sh"
+source "${script_dir}/../lib/doctor_view.sh"
 
 printf -v self_command '%q %q' "$BASH" "${script_dir}/multienv-tui"
 printf -v child_shell '%q -c' "$BASH"
@@ -336,6 +360,12 @@ preview_session() {
 
 ui_header() {
     local mode="${1:?need mode}" archives=hidden ignored=hidden
+    if [[ "$mode" == doctor ]]; then
+        printf 'DOCTOR · ctrl-b, ctrl-/ or F1 or Esc back\nctrl-r rerun\n'
+        printf 'Type to filter · arrows and PageUp/PageDown scroll\n'
+        return
+    fi
+
     if [[ "$mode" == tmux ]]; then
         printf 'TMUX · ctrl-b Codex\nEnter switch · ctrl-l windows · ctrl-h sessions\n'
         printf 'Tab select sessions · j/k move in windows\n'
@@ -349,6 +379,7 @@ ui_header() {
         printf 'ctrl-t ignored\n'
     fi
     printf 'ctrl-v toggle name/host ↔ all visible fields\n'
+    printf 'ctrl-/ or F1 doctor\n'
 }
 
 ui_prompt() {
@@ -581,9 +612,14 @@ picker_bindings() {
 }
 
 run_picker() {
-    local mode="${1:?need mode}" query="${2:-}" options keys=ctrl-b search_fields=1,2
+    local mode="${1:?need mode}" query="${2:-}" options keys=ctrl-b,ctrl-/,f1 search_fields=1,2
     local refresh_binding="every(3):bg-transform($self_command --refresh-list $mode)"
     local args=()
+    if [[ "$mode" == doctor ]]; then
+        run_doctor_picker "$query"
+        return
+    fi
+
     options="$(list_options "$mode")" || return
     if [[ "$mode" == tmux ]]; then
         rm -f "${MULTIENV_TUI_STATE_DIR:?need UI state}/tmux-window"
@@ -636,7 +672,8 @@ cleanup() {
 
 main() {
     local mode="${1:-tmux}" selected query key rows encoded status command
-    local -A queries=([tmux]='' [codex]='')
+    local previous_mode=tmux
+    local -A queries=([tmux]='' [codex]='' [doctor]='')
     is_in_tmux || die 'Run multienv-tui inside tmux'
     for command in fzf jq multienv-agent; do
         command -v "$command" >/dev/null || die "Missing command: $command"
@@ -663,8 +700,21 @@ main() {
         queries[$mode]="$query"
         case "$key" in
         ctrl-b)
-            if [[ "$mode" == tmux ]]; then mode=codex; else mode=tmux; fi
+            case "$mode" in
+            tmux) mode=codex ;;
+            codex) mode=tmux ;;
+            doctor) mode="$previous_mode" ;;
+            esac
             ;;
+        ctrl-/ | f1)
+            if [[ "$mode" == doctor ]]; then
+                mode="$previous_mode"
+            else
+                previous_mode="$mode"
+                mode=doctor
+            fi
+            ;;
+        esc) mode="$previous_mode" ;;
         ctrl-n) create_session ;;
         '')
             [[ "$rows" == *$'\t'* ]] || continue
@@ -690,12 +740,16 @@ main() {
 }
 
 usage() {
-    printf 'Usage: multienv-tui [--no-popup] [tmux|codex]\n\n'
+    printf 'Usage: multienv-tui [--no-popup] [tmux|codex|doctor]\n'
+    printf '       multienv-tui --doctor [--help]\n\n'
+    printf '  --doctor    Check TUI dependencies and run global agent diagnostics\n'
     printf '  --no-popup  Show the dashboard in the current tmux pane\n'
     printf '              Local resume replaces the dashboard in this pane\n\n'
     ui_header tmux
     printf '\n'
     ui_header codex
+    printf '\n'
+    ui_header doctor
 }
 
 start_ui() {
@@ -703,7 +757,7 @@ start_ui() {
     while (($# > 0)); do
         case "$1" in
         --no-popup) export MULTIENV_TUI_POPUP=0 ;;
-        tmux | codex) mode="$1" ;;
+        tmux | codex | doctor) mode="$1" ;;
         --help | -h)
             usage
             return
@@ -720,6 +774,7 @@ start_ui() {
 
 dispatch() {
     case "${1:-tmux}" in
+    --doctor-report) doctor_report ;;
     --list) list_options "${2:?need mode}" "${3:-}" ;;
     --refresh-list) refresh_list "${2:?need mode}" ;;
     --preview) [[ -z "${2:-}" ]] || preview_session "$2" ;;
@@ -738,7 +793,7 @@ dispatch() {
         ;;
     --rename) [[ -z "${2:-}" ]] || rename_session "$2" ;;
     --resume-when-visible) resume_when_visible "${2:?need session id}" ;;
-    tmux | codex | --no-popup | --help | -h | '') start_ui "$@" ;;
+    tmux | codex | doctor | --no-popup | --help | -h | '') start_ui "$@" ;;
     *)
         printf 'Unknown option: %s\n' "$1" >&2
         return 2

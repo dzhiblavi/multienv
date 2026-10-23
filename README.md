@@ -310,6 +310,7 @@ Uninstalling Multienv leaves your tmux sessions and Codex conversations in place
 ```sh
 multienv-tui                 # Start in tmux mode
 multienv-tui codex           # Start in Codex mode
+multienv-tui doctor          # Open the diagnostics view
 multienv-tui --no-popup      # Use the current pane instead of a popup
 multienv-tui --help
 ```
@@ -317,7 +318,10 @@ multienv-tui --help
 Run the dashboard inside tmux. Type to search, use arrow keys or Ctrl-J/Ctrl-K to
 move, and press Enter to open the current item. Tab marks sessions for batch actions;
 Enter always opens just the current item. `?` toggles the help header. Ctrl-B switches
-to the optional Codex view and back; Esc closes the dashboard when the session list has focus.
+between tmux and the optional Codex view. Ctrl-/ or F1 opens doctor directly.
+The doctor view shows a searchable, colored report from `multienv-tui --doctor`;
+Ctrl-R reruns it, and Esc, Ctrl-/ or F1 returns to the previous view.
+Esc closes the dashboard when the session list has focus.
 The list and preview refresh every three seconds.
 Search matches only the session name (or the title in Codex mode) and the displayed host.
 Ctrl-V toggles searching all visible fields, including the tmux command and directory;
@@ -427,7 +431,7 @@ For stale remote sessions, check server logs, SSH access from the master, and
 ## CLI and scripting
 
 The launcher accepts `multienv SESSION [HOSTNAME]`; the host defaults to the current
-machine. The agent has three command trees and a shared configuration flag:
+machine. The agent accepts a shared configuration flag:
 
 ```sh
 multienv-agent [--config PATH] tmux COMMAND
@@ -436,9 +440,14 @@ multienv-agent [--config PATH] master COMMAND
 multienv-agent help tmux
 ```
 
-Commands with parameters read one JSON object from stdin. Queries and commands
-that return a result write JSON to stdout; logs and errors go to stderr. Successful
+In the `tmux`, `codex` and `master` command trees, parameters are read as one JSON
+object from stdin. Commands that return a result write JSON to stdout; logs and errors go to stderr. Successful
 commands without a result produce no stdout output.
+
+### Diagnostics
+
+If something is not working, run `multienv-agent doctor global`, or
+`multienv-tui --doctor` to include TUI checks. See each command's `--help` for details.
 
 ### Session queries and synchronization
 

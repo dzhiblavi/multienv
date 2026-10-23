@@ -64,3 +64,8 @@ func (s Server) Install(name string, disp dispatcher.Dispatcher) error {
 	s.mux.HandleFunc("POST /"+name, makeHandler(disp))
 	return nil
 }
+
+func (s Server) InstallQueries(name string, disp dispatcher.Dispatcher) error {
+	s.mux.HandleFunc("GET /"+name+"/{action}", makeQueryHandler(disp))
+	return nil
+}

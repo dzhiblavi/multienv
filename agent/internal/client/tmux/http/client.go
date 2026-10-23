@@ -21,7 +21,7 @@ func (c httpClient) SetSessions(
 ) (*operations.SetSessionsResponse, error) {
 	var resp operations.SetSessionsResponse
 
-	if err := c.client.Request(ctx, "tmux", "set-sessions", req, &resp); err != nil {
+	if err := c.client.Post(ctx, "tmux", "set-sessions", req, &resp); err != nil {
 		return nil, err
 	}
 
@@ -34,7 +34,7 @@ func (c httpClient) ListAll(
 ) (*operations.ListAllResponse, error) {
 	var resp operations.ListAllResponse
 
-	if err := c.client.Request(ctx, "tmux", "list-all", req, &resp); err != nil {
+	if err := c.client.Post(ctx, "tmux", "list-all", req, &resp); err != nil {
 		return nil, err
 	}
 
@@ -47,7 +47,7 @@ func (c httpClient) SetSession(
 ) (*operations.SetSessionResponse, error) {
 	var resp operations.SetSessionResponse
 
-	if err := c.client.Request(ctx, "tmux", "set-session", req, &resp); err != nil {
+	if err := c.client.Post(ctx, "tmux", "set-session", req, &resp); err != nil {
 		return nil, err
 	}
 
@@ -60,7 +60,7 @@ func (c httpClient) DeleteSession(
 ) (*operations.DeleteSessionResponse, error) {
 	var resp operations.DeleteSessionResponse
 
-	if err := c.client.Request(ctx, "tmux", "delete-session", req, &resp); err != nil {
+	if err := c.client.Post(ctx, "tmux", "delete-session", req, &resp); err != nil {
 		return nil, err
 	}
 
@@ -73,7 +73,7 @@ func (c httpClient) SyncAllSessions(
 ) (*operations.SyncAllSessionsResponse, error) {
 	var resp operations.SyncAllSessionsResponse
 
-	if err := c.client.Request(ctx, "tmux", "sync-all", req, &resp); err != nil {
+	if err := c.client.Post(ctx, "tmux", "sync-all", req, &resp); err != nil {
 		return nil, err
 	}
 
@@ -86,7 +86,7 @@ func (c httpClient) ForwardAgent(
 ) (*operations.ForwardAgentResponse, error) {
 	var resp operations.ForwardAgentResponse
 
-	if err := c.client.Request(ctx, "tmux", "forward-agent", req, &resp); err != nil {
+	if err := c.client.Post(ctx, "tmux", "forward-agent", req, &resp); err != nil {
 		return nil, err
 	}
 

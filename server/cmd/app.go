@@ -7,6 +7,7 @@ import (
 
 	"multienv/common/util"
 	"multienv/server/internal/codex"
+	"multienv/server/internal/doctor"
 	"multienv/server/internal/httpserver"
 	"multienv/server/internal/master"
 	"multienv/server/internal/storage"
@@ -74,7 +75,20 @@ func newRootCmd() *cobra.Command {
 			}
 			codexDispatcher := codex.New(config.Codex, codexStorage)
 
+			hosts := append(append([]string{}, config.Tmux.Hosts...), config.Codex.Hosts...)
+			diagnostics, err := doctor.New(hosts, map[string]doctor.SnapshotReader{
+				"tmux": tmuxStorage, "codex": codexStorage,
+			}, doctor.AgentRunner{})
+			if err != nil {
+				app.Close()
+				return fmt.Errorf("create doctor: %w", err)
+			}
+
 			app.server = httpserver.New(config.Server)
+			if err := app.server.InstallQueries("doctor", doctor.NewDispatcher(diagnostics)); err != nil {
+				app.Close()
+				return fmt.Errorf("install doctor: %w", err)
+			}
 
 			if err := app.server.Install("tmux", tmuxDispatcher); err != nil {
 				app.Close()
