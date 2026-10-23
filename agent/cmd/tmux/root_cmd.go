@@ -47,5 +47,6 @@ func NewCommand(configPath *string) *cobra.Command {
 	cmd.AddCommand(newMoveWindowCmd(&app))
 	cmd.AddCommand(newKillSessionCmd(&app))
 	cmd.AddCommand(newRenameSessionCmd(&app))
+	cmd.AddCommand(newRenameWindowCmd(&app))
 	return cmd
 }

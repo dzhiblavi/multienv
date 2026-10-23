@@ -246,7 +246,7 @@ preview_tmux_windows() {
          end) as $cursor |
         (.name | text | styled("1;36")),
         (if $selection == null then "ctrl-l select windows"
-         else "ctrl-h sessions · j/k · ctrl-n new · ctrl-o index · Enter switch" end |
+         else "ctrl-h back · j/k · ctrl-n new · ctrl-o index · ctrl-r rename · Enter" end |
             styled("90")), "",
         if (.windows // [] | length) == 0 then "No windows available" else
             $windows | to_entries[] |
@@ -305,7 +305,7 @@ update_tmux_window() {
 
 focus_tmux_windows() {
     [[ -n "${1:-}" ]] && update_tmux_window "$1" || return
-    printf 'disable-search+unbind(ctrl-x,ctrl-r,ctrl-p,ctrl-v,tab,btab,alt-up,alt-down)+'
+    printf 'disable-search+unbind(ctrl-x,ctrl-p,ctrl-v,tab,btab,alt-up,alt-down)+'
     printf 'change-preview-window(+%s/2)+refresh-preview\n' \
         "$(jq -r '.line' "${MULTIENV_TUI_STATE_DIR}/tmux-window")"
 }
@@ -316,7 +316,7 @@ blur_tmux_windows() {
         return
     fi
     rm -f "${MULTIENV_TUI_STATE_DIR}/tmux-window"
-    printf 'enable-search+rebind(ctrl-x,ctrl-r,ctrl-p,ctrl-v,tab,btab,alt-up,alt-down)+'
+    printf 'enable-search+rebind(ctrl-x,ctrl-p,ctrl-v,tab,btab,alt-up,alt-down)+'
     printf 'change-preview-window(+0)+refresh-preview\n'
 }
 
@@ -414,6 +414,24 @@ session_action() {
     return "$status"
 }
 
+rename_tmux_item() {
+    if tmux_window_focused; then
+        rename_window "$@"
+    else
+        rename_session "$@"
+    fi
+}
+
+rename_window() {
+    local request name
+    request="$(selected_tmux_window "${1:?need session}")" || return
+
+    IFS= read -r -p 'New window name: ' name </dev/tty || return
+    [[ -n "$name" ]] || return 0
+    jq --arg name "$name" '. + {new_name: $name}' <<<"$request" |
+        multienv-agent tmux rename-window >>"$log_file" 2>&1 || show_error 'Rename window failed'
+}
+
 rename_session() {
     local session name
     session="$(decode_session "${1:?need session}")" || return
@@ -464,15 +482,20 @@ move_window_index_binding() {
         "$self_command" "$1" "$self_command"
 }
 
-move_window_index() {
-    local session request index
+selected_tmux_window() {
+    local session
     tmux_window_focused || return
 
     session="$(decode_session "${1:?need session}")" || return
-    request="$(jq -ce --argjson session "$session" '
+    jq -ce --argjson session "$session" '
         select(.hostname == $session.hostname and .session_id == $session.id) |
         {hostname, session_id, window_id}
-    ' "${MULTIENV_TUI_STATE_DIR}/tmux-window")" || return
+    ' "${MULTIENV_TUI_STATE_DIR}/tmux-window"
+}
+
+move_window_index() {
+    local request index
+    request="$(selected_tmux_window "${1:?need session}")" || return
 
     IFS= read -r -p 'New window index: ' index </dev/tty || return
     [[ -n "$index" ]] || return 0
@@ -851,7 +874,7 @@ dispatch() {
         shift
         session_action "$@"
         ;;
-    --rename) [[ -z "${2:-}" ]] || rename_session "$2" ;;
+    --rename) [[ -z "${2:-}" ]] || rename_tmux_item "$2" ;;
     --resume-when-visible) resume_when_visible "${2:?need session id}" ;;
     tmux | codex | doctor | --no-popup | --help | -h | '') start_ui "$@" ;;
     *)
