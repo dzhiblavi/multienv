@@ -12,7 +12,7 @@ import (
 type NewWindowParams struct {
 	Hostname  string   `json:"hostname"`
 	SessionId string   `json:"session_id"`
-	Name      string   `json:"name"`
+	Name      string   `json:"name,omitempty"`
 	WorkDir   string   `json:"work_dir,omitempty"`
 	Command   []string `json:"command,omitempty"`
 }
@@ -22,9 +22,10 @@ type NewWindowResult struct {
 }
 
 func (a Agent) NewWindow(ctx context.Context, params NewWindowParams) (*NewWindowResult, error) {
-	if params.Hostname == "" || params.SessionId == "" || params.Name == "" {
-		return nil, fmt.Errorf("hostname, session_id and name are required")
+	if params.Hostname == "" || params.SessionId == "" {
+		return nil, fmt.Errorf("hostname and session_id are required")
 	}
+
 	if params.Hostname == a.hostname {
 		paneId, err := tmux.NewWindow(
 			ctx, params.SessionId, params.Name, params.WorkDir, params.Command,

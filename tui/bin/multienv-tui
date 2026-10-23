@@ -245,7 +245,8 @@ preview_tmux_windows() {
             ($windows | map(.active) | index(true)) // 0
          end) as $cursor |
         (.name | text | styled("1;36")),
-        (if $selection == null then "ctrl-l select windows" else "ctrl-h sessions · j/k move · Enter switch" end |
+        (if $selection == null then "ctrl-l select windows"
+         else "ctrl-h sessions · j/k move · ctrl-n new · Enter switch" end |
             styled("90")), "",
         if (.windows // [] | length) == 0 then "No windows available" else
             $windows | to_entries[] |
@@ -304,7 +305,7 @@ update_tmux_window() {
 
 focus_tmux_windows() {
     [[ -n "${1:-}" ]] && update_tmux_window "$1" || return
-    printf 'disable-search+unbind(ctrl-x,ctrl-r,ctrl-n,ctrl-p,ctrl-v,tab,btab,alt-up,alt-down)+'
+    printf 'disable-search+unbind(ctrl-x,ctrl-r,ctrl-p,ctrl-v,tab,btab,alt-up,alt-down)+'
     printf 'change-preview-window(+%s/2)+refresh-preview\n' \
         "$(jq -r '.line' "${MULTIENV_TUI_STATE_DIR}/tmux-window")"
 }
@@ -315,7 +316,7 @@ blur_tmux_windows() {
         return
     fi
     rm -f "${MULTIENV_TUI_STATE_DIR}/tmux-window"
-    printf 'enable-search+rebind(ctrl-x,ctrl-r,ctrl-n,ctrl-p,ctrl-v,tab,btab,alt-up,alt-down)+'
+    printf 'enable-search+rebind(ctrl-x,ctrl-r,ctrl-p,ctrl-v,tab,btab,alt-up,alt-down)+'
     printf 'change-preview-window(+0)+refresh-preview\n'
 }
 
@@ -334,7 +335,7 @@ accept_tmux_session() {
     if tmux_window_focused; then
         [[ -n "${1:-}" ]] && update_tmux_window "$1" || return
     fi
-    printf 'clear-multi+accept\n'
+    printf 'clear-multi+print()+accept\n'
 }
 
 preview_session() {
@@ -436,6 +437,24 @@ query_string() {
     tmux display-popup -E "$popup_command" || return
     cat "$response_file"
     rm -f "$response_file"
+}
+
+new_tmux_item() {
+    if ! tmux_window_focused; then
+        printf 'print(ctrl-n)+accept\n'
+        return
+    fi
+
+    [[ -n "${1:-}" ]] || return
+    printf 'execute-silent(%s --create-window %q)+bg-cancel+bg-transform(%s --refresh-list tmux)\n' \
+        "$self_command" "$1" "$self_command"
+}
+
+create_window() {
+    local session
+    session="$(decode_session "${1:?need session}")" || return
+    jq '{hostname, session_id: .id}' <<<"$session" |
+        multienv-agent tmux new-window >>"$log_file" 2>&1 || show_error 'Create window failed'
 }
 
 create_session() {
@@ -567,15 +586,21 @@ open_codex_session() {
 }
 
 picker_bindings() {
-    local mode="${1:?need mode}" bindings
+    local mode="${1:?need mode}" bindings key
     bindings='start:hide-header,?:toggle-header'
+
+    for key in ctrl-b ctrl-/ f1; do
+        bindings+=",$key:print($key)+accept"
+    done
+
     if [[ "$mode" == tmux ]]; then
         bindings+=",enter:transform($self_command --accept-tmux {6})"
         bindings+=",double-click:transform($self_command --accept-tmux {6})"
+        bindings+=",ctrl-n:transform($self_command --new-tmux-item {6})"
         bindings+=",ctrl-l:transform($self_command --focus-windows {6})"
         bindings+=",ctrl-h:transform($self_command --blur-windows)"
         bindings+=",esc:transform($self_command --blur-windows abort)"
-        local key fallback
+        local fallback
         for key in up ctrl-k k; do
             fallback=up
             [[ "$key" == k ]] && fallback='put(k)'
@@ -591,8 +616,8 @@ picker_bindings() {
         bindings+=",ctrl-r:execute($self_command --rename {6})"
         bindings+="+bg-cancel+clear-multi+bg-transform($self_command --refresh-list tmux)"
     else
-        bindings+=',enter:clear-multi+accept,double-click:clear-multi+accept'
-        local key action
+        bindings+=',enter:clear-multi+print()+accept,double-click:clear-multi+print()+accept'
+        local action
         for key in ctrl-a ctrl-u ctrl-x; do
             case "$key" in
             ctrl-a) action=archive-session ;;
@@ -615,7 +640,7 @@ picker_bindings() {
 }
 
 run_picker() {
-    local mode="${1:?need mode}" query="${2:-}" options keys=ctrl-b,ctrl-/,f1 search_fields=1,2
+    local mode="${1:?need mode}" query="${2:-}" options search_fields=1,2
     local refresh_binding="every(3):bg-transform($self_command --refresh-list $mode)"
     local args=()
     if [[ "$mode" == doctor ]]; then
@@ -626,7 +651,6 @@ run_picker() {
     options="$(list_options "$mode")" || return
     if [[ "$mode" == tmux ]]; then
         rm -f "${MULTIENV_TUI_STATE_DIR:?need UI state}/tmux-window"
-        keys+=,ctrl-n
         popup_enabled && args+=(--tmux=center,90%,90%)
         args+=(--layout=reverse --no-sort)
         args+=(--preview="$self_command --preview-tmux-windows {6}")
@@ -638,7 +662,7 @@ run_picker() {
         args+=(--preview="$self_command --preview {6}")
         args+=(--preview-window='right,50%,border-left,wrap')
     fi
-    ui_fzf --ansi --multi --no-select-1 --no-expect --expect="$keys" \
+    ui_fzf --ansi --multi --no-select-1 --no-expect \
         --prompt="$(ui_prompt "$mode")" --delimiter=$'\t' --with-nth=1,2,3 --nth="$search_fields" \
         --track --id-nth=4,5 --print-query --query="$query" \
         --header="$(ui_header "$mode")" --with-shell="$child_shell" \
@@ -777,6 +801,8 @@ start_ui() {
 
 dispatch() {
     case "${1:-tmux}" in
+    --new-tmux-item) new_tmux_item "${2:-}" ;;
+    --create-window) create_window "${2:?need session}" ;;
     --doctor-report) doctor_report ;;
     --list) list_options "${2:?need mode}" "${3:-}" ;;
     --refresh-list) refresh_list "${2:?need mode}" ;;

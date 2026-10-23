@@ -19,9 +19,14 @@ func NewWindow(
 		Name: "tmux",
 		Args: []string{
 			"new-window", "-d", "-P", "-F", "#{pane_id}",
-			"-t", sessionId + ":", "-n", name,
+			"-t", sessionId + ":",
 		},
 	}
+
+	if name != "" {
+		cmd.Args = append(cmd.Args, "-n", name)
+	}
+
 	if workDir != "" {
 		info, err := os.Stat(workDir)
 		if err != nil {
