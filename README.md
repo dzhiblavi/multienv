@@ -358,10 +358,8 @@ active pane. Home paths are shortened to `~`; long paths show their trailing por
 | Ctrl-O in the window list | Move the selected window to a new index |
 | Ctrl-R in the session list | Rename the current session |
 | Ctrl-R in the window list | Rename the selected window |
-| Ctrl-X | Kill marked sessions, or the current session if none are marked |
-
-Session kill shortcuts are disabled while the windows have focus. The TUI does
-not provide window deletion controls.
+| Ctrl-X in the session list | Kill marked sessions, or the current session if none are marked |
+| Ctrl-X in the window list | Kill the selected window; the last window is protected |
 
 ### Optional Codex integration
 
@@ -482,6 +480,7 @@ can complete while individual hosts fail; check server logs and snapshot ages.
 | `rename-session` | `hostname`, `session_id`, `new_name` |
 | `rename-window` | `hostname`, `session_id`, `window_id`, `new_name` |
 | `kill-session` | `hostname`, `session_id` |
+| `kill-window` | `hostname`, `session_id`, `window_id` |
 | `new-window` | `hostname`, `session_id`; optional `name`, `work_dir`, `command` (an argument array) |
 | `move-window` | `hostname`, `session_id`, `window_id`, `new_index` |
 
