@@ -31,6 +31,14 @@ func (s Dispatcher) Dispatch(ctx context.Context, payload string) (any, error) {
 	log.Info(ctx, "dispatch")
 
 	switch env.Action {
+	case "pane-preview":
+		var req operations.PanePreviewRequest
+		if err := json.Unmarshal(env.Request, &req); err != nil {
+			return nil, dispatcher.ErrInvalidParams
+		}
+
+		return s.PanePreview(ctx, req)
+
 	case "list-all":
 		var req operations.ListAllRequest
 		if err := json.Unmarshal(env.Request, &req); err != nil {

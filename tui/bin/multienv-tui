@@ -258,22 +258,25 @@ preview_tmux_windows() {
 }
 
 preview_tmux_window_pane() {
-    local session="${1:?need session}" selection="${2:-null}" target separator
-    is_on_hostname "$(jq -r '.hostname' <<<"$session")" || return 0
+    local session="${1:?need session}" selection="${2:-null}" request response separator
+    if ! is_on_hostname "$(jq -r '.hostname' <<<"$session")" && [[ "$c_remote_pane_preview" != 1 ]]; then
+        return 0
+    fi
 
-    target="$(jq -r --argjson selection "$selection" '
+    request="$(jq -c --argjson selection "$selection" '
         . as $session | (.windows // [] | sort_by(.index)) as $windows |
         (if $selection.hostname == .hostname and $selection.session_id == .id then
             $windows | map(select(.id == $selection.window_id)) | .[0]
          else null end) // ($windows | map(select(.active)) | .[0]) // $windows[0] |
-        $session.id + ":" + (.id // "")
+        {hostname: $session.hostname, target: ($session.id + ":" + (.id // ""))}
     ' <<<"$session")" || return
+
+    response="$(multienv-agent tmux pane-preview <<<"$request" 2>>"$log_file")" || return 0
+    jq -e '.content | type == "string"' <<<"$response" >/dev/null 2>>"$log_file" || return 0
 
     printf -v separator '%*s' "${FZF_PREVIEW_COLUMNS:-80}" ''
     printf '\n\033[90m%s\nPane preview\033[0m\n\n' "${separator// /─}"
-    if ! tmux capture-pane -p -e -t "$target" 2>>"$log_file"; then
-        printf '\033[90mPane preview unavailable\033[0m\n'
-    fi
+    jq -j '.content' <<<"$response"
 }
 
 tmux_window_focused() {

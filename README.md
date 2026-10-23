@@ -340,9 +340,10 @@ active pane. Home paths are shortened to `~`; long paths show their trailing por
 - A red `!` means the snapshot is older than 30 seconds and takes precedence over the dot.
 - The right pane lists windows by index, one line each, with a green dot on the active
   window. The command is omitted when it matches the window name.
-- For local sessions, the active pane's contents appear below the window list. The
+- The active pane's contents appear below the window list when available. The
   preview follows the selected window when the window list has focus and refreshes
-  every three seconds.
+  every three seconds. Remote previews are disabled by default; set
+  `c_remote_pane_preview=1` in `tui.sh` to enable them.
 
 | Key | Action |
 | --- | --- |
@@ -473,6 +474,7 @@ can complete while individual hosts fail; check server logs and snapshot ages.
 
 | Command | JSON fields |
 | --- | --- |
+| `pane-preview` | `hostname`, `target` |
 | `new-session` | `hostname`, `name` |
 | `rename-session` | `hostname`, `session_id`, `new_name` |
 | `kill-session` | `hostname`, `session_id` |

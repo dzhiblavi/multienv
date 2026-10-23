@@ -92,3 +92,15 @@ func (c httpClient) ForwardAgent(
 
 	return &resp, nil
 }
+
+func (c httpClient) PanePreview(
+	ctx context.Context,
+	req operations.PanePreviewRequest,
+) (*operations.PanePreviewResponse, error) {
+	var response operations.PanePreviewResponse
+	if err := c.client.Post(ctx, "tmux", "pane-preview", req, &response); err != nil {
+		return nil, err
+	}
+
+	return &response, nil
+}

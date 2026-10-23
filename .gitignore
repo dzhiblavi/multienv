@@ -9,6 +9,7 @@
 *.test
 /go.work
 /go.work.sum
+/NOTES.md
 
 # Coverage and profiling
 /coverage/

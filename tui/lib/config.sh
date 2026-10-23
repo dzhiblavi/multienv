@@ -6,6 +6,7 @@ init_config() {
     # All these values can be overriden by the user
 
     c_ctrl_port=7777
+    c_remote_pane_preview=0
     c_log_file_path="/tmp/multienv-tui.log"
     c_tui_ignore_file_path="${HOME}/.config/multienv/.multienv-tui-ignore"
 

@@ -7,6 +7,11 @@ import (
 )
 
 type Client interface {
+	PanePreview(
+		ctx context.Context,
+		op operations.PanePreviewRequest,
+	) (*operations.PanePreviewResponse, error)
+
 	ListAll(
 		ctx context.Context,
 		op operations.ListAllRequest,
