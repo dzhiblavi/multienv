@@ -246,7 +246,7 @@ preview_tmux_windows() {
          end) as $cursor |
         (.name | text | styled("1;36")),
         (if $selection == null then "ctrl-l select windows"
-         else "ctrl-h sessions · j/k move · ctrl-n new · Enter switch" end |
+         else "ctrl-h sessions · j/k · ctrl-n new · ctrl-o index · Enter switch" end |
             styled("90")), "",
         if (.windows // [] | length) == 0 then "No windows available" else
             $windows | to_entries[] |
@@ -457,6 +457,34 @@ create_window() {
         multienv-agent tmux new-window >>"$log_file" 2>&1 || show_error 'Create window failed'
 }
 
+move_window_index_binding() {
+    tmux_window_focused && [[ -n "${1:-}" ]] || return
+
+    printf 'execute(%s --move-window-index %q)+bg-cancel+bg-transform(%s --refresh-list tmux)\n' \
+        "$self_command" "$1" "$self_command"
+}
+
+move_window_index() {
+    local session request index
+    tmux_window_focused || return
+
+    session="$(decode_session "${1:?need session}")" || return
+    request="$(jq -ce --argjson session "$session" '
+        select(.hostname == $session.hostname and .session_id == $session.id) |
+        {hostname, session_id, window_id}
+    ' "${MULTIENV_TUI_STATE_DIR}/tmux-window")" || return
+
+    IFS= read -r -p 'New window index: ' index </dev/tty || return
+    [[ -n "$index" ]] || return 0
+    if [[ ! "$index" =~ ^[0-9]+$ ]]; then
+        show_error 'Window index must be a non-negative integer'
+        return 1
+    fi
+
+    jq --arg index "$index" '. + {new_index: ($index | tonumber)}' <<<"$request" |
+        multienv-agent tmux move-window >>"$log_file" 2>&1 || show_error 'Move window failed'
+}
+
 create_session() {
     local hosts aliases selected host name
     hosts="$(multienv-agent tmux list-all 2>>"$log_file" | jq -r 'keys[]')" || return
@@ -597,6 +625,7 @@ picker_bindings() {
         bindings+=",enter:transform($self_command --accept-tmux {6})"
         bindings+=",double-click:transform($self_command --accept-tmux {6})"
         bindings+=",ctrl-n:transform($self_command --new-tmux-item {6})"
+        bindings+=",ctrl-o:transform($self_command --move-window-index-binding {6})"
         bindings+=",ctrl-l:transform($self_command --focus-windows {6})"
         bindings+=",ctrl-h:transform($self_command --blur-windows)"
         bindings+=",esc:transform($self_command --blur-windows abort)"
@@ -803,6 +832,8 @@ dispatch() {
     case "${1:-tmux}" in
     --new-tmux-item) new_tmux_item "${2:-}" ;;
     --create-window) create_window "${2:?need session}" ;;
+    --move-window-index-binding) move_window_index_binding "${2:-}" ;;
+    --move-window-index) move_window_index "${2:?need session}" ;;
     --doctor-report) doctor_report ;;
     --list) list_options "${2:?need mode}" "${3:-}" ;;
     --refresh-list) refresh_list "${2:?need mode}" ;;

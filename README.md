@@ -355,11 +355,12 @@ active pane. Home paths are shortened to `~`; long paths show their trailing por
 | Ctrl-V in the session list | Toggle name/host search and search across all visible fields |
 | Ctrl-N in the session list | Create a session; choose its host and name |
 | Ctrl-N in the window list | Create a window with an automatic name in the selected session |
+| Ctrl-O in the window list | Move the selected window to a new index |
 | Ctrl-R | Rename the current session |
 | Ctrl-X | Kill marked sessions, or the current session if none are marked |
 
 Session rename and kill shortcuts are disabled while the windows have focus. The
-TUI supports selecting and creating windows, without window rename or deletion controls.
+TUI supports selecting, creating and moving windows, without window rename or deletion controls.
 
 ### Optional Codex integration
 
@@ -480,6 +481,7 @@ can complete while individual hosts fail; check server logs and snapshot ages.
 | `rename-session` | `hostname`, `session_id`, `new_name` |
 | `kill-session` | `hostname`, `session_id` |
 | `new-window` | `hostname`, `session_id`; optional `name`, `work_dir`, `command` (an argument array) |
+| `move-window` | `hostname`, `session_id`, `window_id`, `new_index` |
 
 ```sh
 printf '%s\n' '{"hostname":"devbox","name":"project"}' | multienv-agent tmux new-session
