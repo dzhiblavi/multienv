@@ -2,6 +2,7 @@ BUILD_FLAGS=-ldflags="-s -w" -trimpath
 INSTALL_DIR=~/.bin
 MAKEFILE_DIR := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
 LAUNCHER_BIN := $(MAKEFILE_DIR)/../launcher/bin
+REMOTE_HOST ?= dev-vm
 
 install-server:
 	@go build $(BUILD_FLAGS) \
@@ -26,10 +27,6 @@ install-launcher:
 		$(LAUNCHER_BIN)/multienv $(INSTALL_DIR)/multienv \
 		&& echo "install multienv $(shell hostname) OK"
 
-sync:
-	@rsync -av --delete --exclude=.git --filter=':- .gitignore' \
-		../ dev-vm:/home/dzhiblavi/tools/multienv >/dev/null
-
 local:
 	$(MAKE) install-agent # install ~/.bin/multienv-agent
 	$(MAKE) install-server # install ~/.bin/multienv-server
@@ -39,6 +36,3 @@ local:
 remote:
 	$(MAKE) install-agent # install ~/.bin/multienv-agent
 	$(MAKE) install-tui # install ~/.bin/multienv-tui
-
-remote-ssh: sync
-	ssh dev-vm make -C /home/dzhiblavi/tools/multienv/deploy remote

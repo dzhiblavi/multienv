@@ -14,104 +14,39 @@ title or activity, jump to its running pane, or resume it in a tmux window. Desk
 commands also let you send notifications and open links on your workstation from
 a remote shell.
 
+## Installation
+
+See [installation](install/README.md) for build requirements and installation commands.
+
 ## Requirements
 
-Run one coordinating server and install the agent on each managed host. The examples
-use a macOS workstation, called the **master**, and one or more Linux hosts. The tmux
-workflow works on macOS and Linux; the current desktop notification and open commands
-require the server to run on macOS.
+- Managed hosts: tmux, version 3.3+ for TUI popups.
+- Server: Redis with JSON support and passwordless SSH access to managed hosts.
+- Launcher: Bash 4+ first in `PATH`, SSH, jq, Mike Farah's `yq` and OpenBSD-compatible `nc` with `-k`.
+- Forwarder: Bash 4+ and jq. Remote hosts need an SSH server with TCP forwarding enabled.
+- Optional Codex integration: `lsof` and Codex CLI with `--no-daemon`, `resume`, `archive`, `unarchive`, `delete`.
+- Desktop notifications and opening links require macOS on the server host.
 
-| Component | Required tools |
-| --- | --- |
-| Building | Go 1.25.14 or newer, Make |
-| Each managed host | tmux, `multienv-agent` |
-| Each host running the dashboard | `multienv-tui`, tmux |
-| Workstation launcher and forwarder | Bash 4+, SSH client, jq; launcher also needs Mike Farah's `yq` |
-| Switching between hosts | OpenBSD-compatible `nc` with `-k` support on the workstation |
-| Remote hosts | SSH server, reachable from the master with noninteractive authentication |
-| Server | SSH client, Redis with JSON command support; the bundled setup uses Redis 8.2 |
-| Bundled Redis setup | Docker Compose, OpenSSL, `shasum` |
-| Desktop commands, optional | macOS on the server host, with `osascript` and `/usr/bin/open` |
-| macOS background services, optional | launchd, jq, Mike Farah's `yq`, `jinja2` CLI |
+## Configuration and startup
 
-Use tmux 3.3+ for popup support.
+Use actual hostnames in server lists; SSH aliases can be used in TUI configuration.
+The examples use HTTP port `12401` and launcher port `12400`.
 
-For optional Codex integration, install `lsof` and a Codex CLI with `--no-daemon`,
-`resume`, `archive`, `unarchive` and `delete` commands, and compatible local session
-data. The integration uses `CODEX_HOME` when set, otherwise `~/.codex`.
-
-## Installation and setup
-
-The examples use `macbook` for the master and `devbox` for a remote host. Replace
-these with the exact output of `hostname` on each machine. Host identity matters:
-SSH aliases can be friendly names, but server host lists use the actual hostnames.
-The examples use HTTP port `12401` and control port `12400`; the built-in defaults
-are `12123` and `7777`. Keep the configured ports consistent across the examples.
-
-### 1. Install the programs
-
-Clone this repository on each host and run the following from the checkout.
-On the master:
-
-```sh
-mkdir -p ~/.bin ~/.config/multienv
-make -C deploy local
-```
-
-On each remote host:
-
-```sh
-mkdir -p ~/.bin ~/.config/multienv
-make -C deploy remote
-```
-
-This builds the binaries into `~/.bin` and links the launcher to the checkout.
-Keep the checkout in place while the launcher link is installed. Add `~/.bin`
-to `PATH` in your shell configuration. On macOS, also put your installed Bash 4+
-ahead of `/usr/bin`; for an Apple Silicon Homebrew installation, for example:
-
-```sh
-export PATH="$HOME/.bin:/opt/homebrew/bin:$PATH"
-```
-
-Install matching versions across your hosts when updating Multienv. The
-`remote-ssh` Make target contains a project-specific host and path; use the
-per-host installation commands above for your own setup.
-
-### 2. Start Redis on the master
-
-The bundled deployment creates an application password and keeps Redis data in
-a Docker volume. These commands use Docker Compose v2; omit the `COMPOSE` override
-if your installation provides `docker-compose`.
+On the workstation, start Redis with JSON support. The bundled setup requires Docker Compose, OpenSSL and `shasum`:
 
 ```sh
 make -C deploy/db/redis COMPOSE='docker compose -f compose.yaml' up
-
 umask 077
 printf 'username: app\npassword: %s\n' "$(cat deploy/db/redis/password)" \
     > ~/.config/multienv/redis-credentials.yaml
 ```
 
-You can use an existing Redis instance with JSON support instead. Set its address,
-port, database and credentials in the server configuration below.
-
-### 3. Configure and start the server
-
-Create `~/.config/multienv/server.yaml` on the master:
+Create `~/.config/multienv/server.yaml` on the workstation:
 
 ```yaml
-server:
-  address: 127.0.0.1
-  port: 12401
-
-tmux:
-  hosts:
-    - macbook
-    - devbox
-
-codex:
-  hosts: []
-
+server: {address: 127.0.0.1, port: 12401}
+tmux: {hosts: [macbook, devbox]}
+codex: {hosts: []}
 storage:
   address: 127.0.0.1
   port: 6379
@@ -119,21 +54,7 @@ storage:
   credentials_path: ~/.config/multienv/redis-credentials.yaml
 ```
 
-`tmux.hosts` lists the machines to synchronize. Codex collection is disabled in this
-example; its optional integration has a separate host list, described below.
-Start the server in a terminal and leave it running:
-
-```sh
-multienv-server
-```
-
-Both server and agent accept `--config PATH` or `-c PATH` for an alternative YAML
-file. The HTTP API has no authentication; keep it on loopback and use SSH tunnels
-for access from other machines.
-
-### 4. Configure the agents
-
-Create `~/.config/multienv/agent.yaml` on every host, including the master:
+Create `~/.config/multienv/agent.yaml` on every host:
 
 ```yaml
 client:
@@ -141,45 +62,15 @@ client:
   timeout: 3s
 ```
 
-On remote hosts, this URL will reach the master through the tunnel in the next
-step. Increase the timeout if collecting snapshots from your hosts takes longer.
+The server invokes `~/.bin/multienv-agent` over SSH.
+Make tmux and optional Codex tools available in noninteractive shells.
+Agents run on demand. Server and agent accept `--config PATH` for a different configuration file.
 
-The agent runs when a command is requested; there is no agent daemon to start.
-The server invokes `~/.bin/multienv-agent` on remote hosts over SSH. Make sure `tmux`
-is available in noninteractive SSH sessions. For Codex integration, also make `lsof`,
-`codex` and any custom `CODEX_HOME` setting available in that environment.
-
-### 5. Connect the hosts
-
-The master must be able to SSH to each managed host without a password prompt.
-For example, add this to `~/.ssh/config` on the master:
-
-```sshconfig
-Host dev devbox
-    HostName devbox.example.net
-    User alice
-```
-
-Here, `devbox` matches the remote machine's actual hostname and `dev` is a short
-alias. Check the connection and remote installation:
-
-```sh
-ssh -T -o BatchMode=yes devbox '~/.bin/multienv-agent tmux list-local'
-```
-
-Two reverse forwards let programs on `devbox` reach the master's HTTP server and
-local terminal launcher. Create `~/.config/multienv/forwarder.json` on the master:
+Create `~/.config/multienv/forwarder.json` on the workstation, one file per remote host:
 
 ```json
 {
   "ssh_host": "devbox",
-  "connection": {
-    "connect_timeout_seconds": 10,
-    "connection_attempts": 1,
-    "server_alive_interval_seconds": 3,
-    "server_alive_count_max": 3,
-    "retry_delay_seconds": 5
-  },
   "forwards": [
     {"direction": "R", "spec": "127.0.0.1:12401:127.0.0.1:12401"},
     {"direction": "R", "spec": "127.0.0.1:12400:127.0.0.1:12400"}
@@ -187,125 +78,34 @@ local terminal launcher. Create `~/.config/multienv/forwarder.json` on the maste
 }
 ```
 
-From the checkout on the master, run this in another terminal and leave it running:
+Run these in separate terminals, or configure launchd/systemd yourself:
 
 ```sh
+multienv-server
 bash forward/bin/ssh_port_forwarder.sh --config ~/.config/multienv/forwarder.json
 ```
 
-The optional `connection` section controls SSH timeouts, keepalive probes and the
-delay before reconnecting. Run a separate forwarder instance and configuration for
-each remote host. You can also maintain equivalent SSH forwards yourself. The remote
-SSH server must allow TCP forwarding.
-
-### 6. Configure the terminal UI
-
-Create `~/.config/multienv/tui.yaml` on hosts where you use the terminal programs:
-
-```yaml
-host_aliases:
-  mac: macbook
-  dev: devbox
-
-tmux:
-  control_port: 12400
-```
-
-These aliases label hosts in the UI. The workstation launcher also uses them for
-interactive SSH, so `dev` must resolve through the master's SSH configuration.
-Use the same control port as your reverse forward.
-
-Create an initial tmux session on the master, then start the launcher **outside
-tmux** in your workstation terminal:
+The HTTP API has no authentication; bind it to loopback and access it through SSH tunnels.
+Configure [tui.yaml](#using-the-tui) on each TUI host, matching the forwarded launcher port.
+Its aliases must resolve through the workstation's SSH configuration. Start the launcher outside tmux:
 
 ```sh
 tmux new-session -d -s main
 multienv main
 ```
 
-The launcher attaches to that session and handles future connections between hosts.
-Inside tmux, open the dashboard:
-
-```sh
-multienv-tui
-```
-
-Local session switching also works when you attach to tmux directly. To switch
-between machines, start through `multienv` and keep the control-port forward active
-on remote hosts. A TUI running remotely can then return you to the master or move
-you to another managed host through the workstation launcher.
-
-### Optional: run background services with launchd
-
-On macOS, the repository includes launchd helpers for the server and SSH forwarder.
-Create `~/.config/multienv/server.launchd.yaml`:
-
-```yaml
-label: local.multienv.server
-program_path: ~/.bin/multienv-server
-config_path: ~/.config/multienv/server.yaml
-stdout_path: ~/Library/Logs/multienv/server.log
-stderr_path: ~/Library/Logs/multienv/server.err.log
-environment:
-  PATH: "${HOME}/.bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
-  # SSH_AUTH_SOCK: "${HOME}/.ssh/agent.sock"  # Replace with your agent's socket if needed.
-```
-
-Create `~/.config/multienv/forward.launchd.yaml` for the forwarder. This example
-assumes the checkout is at `~/src/multienv`; update `program_path` to match yours.
-
-```yaml
-label: local.multienv.forward
-program_path: ~/src/multienv/forward/bin/ssh_port_forwarder.sh
-config_path: ~/.config/multienv/forwarder.json
-stdout_path: ~/Library/Logs/multienv/forward.log
-stderr_path: ~/Library/Logs/multienv/forward.err.log
-environment:
-  PATH: "${HOME}/.bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
-  # SSH_AUTH_SOCK: "${HOME}/.ssh/agent.sock"  # Replace with your agent's socket if needed.
-```
-
-launchd does not read your shell startup files. Extend `PATH` with the directories
-containing your tmux, Codex and other required tools. Set `SSH_AUTH_SOCK` if your SSH
-authentication relies on an agent, and `CODEX_HOME` if you use a custom location.
-
-```sh
-make -C deploy/launchd/server enable
-make -C deploy/launchd/forward enable
-```
-
-The same directories provide `status`, `logs`, `render` and `disable` targets.
-`enable` replaces and restarts an existing service. Stop manually started instances
-before enabling the corresponding services.
+Inside tmux, run `multienv-tui`. See the [TUI guide](#using-the-tui).
 
 ## Uninstalling
 
-Stop the launcher and any manually started server or forwarder with Ctrl-C.
-If you enabled launchd services, disable them while their configuration files
-still exist:
+Stop the launcher, server and forwarder, then remove the installed programs:
 
 ```sh
-make -C deploy/launchd/forward disable
-make -C deploy/launchd/server disable
-```
-
-On each host, remove the installed programs and links:
-
-```sh
-rm -f ~/.bin/multienv ~/.bin/multienv-tui \
-    ~/.bin/multienv-agent ~/.bin/multienv-server
-```
-
-To stop the bundled Redis instance while keeping its data:
-
-```sh
+rm -f ~/.bin/multienv ~/.bin/multienv-tui ~/.bin/multienv-agent ~/.bin/multienv-server
 make -C deploy/db/redis COMPOSE='docker compose -f compose.yaml' down
 ```
 
-Optionally remove `~/.config/multienv`, the checkout and any SSH settings you added.
-To also remove the bundled Redis volume, run
-`docker compose -f deploy/db/redis/compose.yaml down -v` before deleting the checkout.
-Uninstalling Multienv leaves your tmux sessions and Codex conversations in place.
+Redis data, tmux sessions, Codex conversations and configuration files remain in place.
 
 ## Using the TUI
 
@@ -317,8 +117,6 @@ multienv-tui --no-popup      # Use the current pane instead of a popup
 multienv-tui --help
 ```
 
-The TUI runs from the checkout with `go run ./tui/cmd`, or install it with
-`make -C deploy install-tui` and run `multienv-tui [tmux|codex|doctor]`.
 Use `--no-popup` for the current pane and `--doctor` for a diagnostic report.
 It reads `~/.config/multienv/tui.yaml`; `--config` overrides only this TUI file.
 The agent configuration is always read from `~/.config/multienv/agent.yaml`.
@@ -421,7 +219,7 @@ codex:
     - devbox
 ```
 
-Install the Codex dependencies above on those hosts. The integration uses the same
+Install the [Codex dependencies](#requirements) on those hosts. The integration uses the same
 agent, SSH connections and tmux sessions as the main workspace. Press Ctrl-B in the
 dashboard, or start with `multienv-tui codex`, to open the conversation view.
 

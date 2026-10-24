@@ -10,6 +10,7 @@
 /go.work
 /go.work.sum
 /NOTES.md
+/Makefile
 
 # Coverage and profiling
 /coverage/
