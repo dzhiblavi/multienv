@@ -5,6 +5,7 @@ import (
 
 	"multienv/agent/cmd/codex"
 	"multienv/agent/cmd/doctor"
+	"multienv/agent/cmd/filesystem"
 	"multienv/agent/cmd/master"
 	"multienv/agent/cmd/tmux"
 )
@@ -30,5 +31,6 @@ func newRootCmd() *cobra.Command {
 	cmd.AddCommand(codex.NewCommand(&configPath))
 	cmd.AddCommand(master.NewCommand(&configPath))
 	cmd.AddCommand(doctor.NewCommand(&configPath))
+	cmd.AddCommand(filesystem.NewCommand(&configPath))
 	return cmd
 }

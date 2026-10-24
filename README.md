@@ -354,12 +354,15 @@ active pane. Home paths are shortened to `~`; long paths show their trailing por
 | Ctrl-H or Esc in the window list | Return focus to the sessions |
 | Ctrl-V in the session list | Toggle name/host search and search across all visible fields |
 | Ctrl-N in the session list | Create a session; choose its host and name |
-| Ctrl-N in the window list | Create a window with an automatic name in the selected session |
+| Ctrl-N in the window list | Choose a directory and create a window with an automatic name |
 | Ctrl-O in the window list | Move the selected window to a new index |
 | Ctrl-R in the session list | Rename the current session |
 | Ctrl-R in the window list | Rename the selected window |
 | Ctrl-X in the session list | Kill marked sessions, or the current session if none are marked |
 | Ctrl-X in the window list | Kill the selected window; the last window is protected |
+
+The directory picker starts with the selected window’s current directory and includes
+directories from zoxide when it is installed on that host. Esc cancels creation.
 
 ### Optional Codex integration
 
@@ -439,10 +442,11 @@ machine. The agent accepts a shared configuration flag:
 multienv-agent [--config PATH] tmux COMMAND
 multienv-agent [--config PATH] codex COMMAND
 multienv-agent [--config PATH] master COMMAND
+multienv-agent [--config PATH] filesystem COMMAND
 multienv-agent help tmux
 ```
 
-In the `tmux`, `codex` and `master` command trees, parameters are read as one JSON
+In the `tmux`, `codex`, `master` and `filesystem` command trees, parameters are read as one JSON
 object from stdin. Commands that return a result write JSON to stdout; logs and errors go to stderr. Successful
 commands without a result produce no stdout output.
 
@@ -510,6 +514,12 @@ printf '%s\n' '{"hostname":"devbox","session_id":"YOUR_CODEX_SESSION_ID"}' \
 ```
 
 `prepare-resume` prepares the session; the TUI or your script starts the Codex process.
+
+### Filesystem operations
+
+| Command | JSON fields |
+| --- | --- |
+| `directory-candidates` | `hostname` |
 
 ### Master operations
 

@@ -28,6 +28,8 @@ func dependencies() []dependency {
 		{name: "codex", group: "codex", optional: true, args: []string{"--no-daemon", "--help"},
 			features: []string{"resume", "archive", "unarchive", "delete"}},
 		{name: "lsof", group: "codex", optional: true, args: []string{"-v"}},
+		{name: "zoxide", group: "filesystem", optional: true, args: []string{"query", "--help"},
+			features: []string{"--list"}},
 	}
 }
 

@@ -40,6 +40,7 @@ script_dir="$(cd "$(dirname "$(realpath "${BASH_SOURCE[0]}")")" && pwd)"
 source "${script_dir}/../lib/prelude.sh"
 source "${script_dir}/../lib/select.sh"
 source "${script_dir}/../lib/doctor_view.sh"
+source "${script_dir}/../lib/directories.sh"
 
 printf -v self_command '%q %q' "$BASH" "${script_dir}/multienv-tui"
 printf -v child_shell '%q -c' "$BASH"
@@ -497,14 +498,26 @@ new_tmux_item() {
     fi
 
     [[ -n "${1:-}" ]] || return
-    printf 'execute-silent(%s --create-window %q)+bg-cancel+bg-transform(%s --refresh-list tmux)\n' \
+    printf 'execute(%s --create-window %q)+bg-cancel+bg-transform(%s --refresh-list tmux)\n' \
         "$self_command" "$1" "$self_command"
 }
 
 create_window() {
-    local session
+    local session selected host current work_dir
+    selected="$(selected_tmux_window "${1:?need session}")" || return
     session="$(decode_session "${1:?need session}")" || return
-    jq '{hostname, session_id: .id}' <<<"$session" |
+
+    host="$(jq -r '.hostname' <<<"$selected")"
+    current="$(jq -er --argjson selected "$selected" '
+        .windows[] | select(.id == $selected.window_id) | .current_path | select(length > 0)
+    ' <<<"$session")" || {
+        show_error 'Selected window has no working directory'
+        return 1
+    }
+
+    IFS= read -r -d '' work_dir < <(choose_directory "$host" "$current") || return 0
+
+    jq --arg dir "$work_dir" '{hostname, session_id: .id, work_dir: $dir}' <<<"$session" |
         multienv-agent tmux new-window >>"$log_file" 2>&1 || show_error 'Create window failed'
 }
 
