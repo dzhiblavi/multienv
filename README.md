@@ -32,14 +32,9 @@ See [installation](install/README.md) for build requirements and installation co
 Use actual hostnames in server lists; SSH aliases can be used in TUI configuration.
 The examples use HTTP port `12401` and launcher port `12400`.
 
-On the workstation, start Redis with JSON support. The bundled setup requires Docker Compose, OpenSSL and `shasum`:
-
-```sh
-make -C deploy/db/redis COMPOSE='docker compose -f compose.yaml' up
-umask 077
-printf 'username: app\npassword: %s\n' "$(cat deploy/db/redis/password)" \
-    > ~/.config/multienv/redis-credentials.yaml
-```
+The server requires a running Redis reachable at the configured storage address and port,
+with `JSON.GET`, `JSON.SET`, `JSON.DEL` and transaction support. Its account must have
+read/write access to the `@tmux` and `@codex` keys in the selected database.
 
 Create `~/.config/multienv/server.yaml` on the workstation:
 
@@ -53,6 +48,8 @@ storage:
   db: 0
   credentials_path: ~/.config/multienv/redis-credentials.yaml
 ```
+
+The credentials file must contain the Redis account's `username` and `password` as YAML fields.
 
 Create `~/.config/multienv/agent.yaml` on every host:
 
@@ -102,7 +99,6 @@ Stop the launcher, server and forwarder, then remove the installed programs:
 
 ```sh
 rm -f ~/.bin/multienv ~/.bin/multienv-tui ~/.bin/multienv-agent ~/.bin/multienv-server
-make -C deploy/db/redis COMPOSE='docker compose -f compose.yaml' down
 ```
 
 Redis data, tmux sessions, Codex conversations and configuration files remain in place.
