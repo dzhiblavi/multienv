@@ -1,7 +1,7 @@
 package tmux
 
 import (
-	"multienv/agent/internal/tmux/service"
+	"multienv/agent/tmux/service"
 )
 
 type App struct {

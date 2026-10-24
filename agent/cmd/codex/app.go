@@ -1,7 +1,7 @@
 package codex
 
 import (
-	"multienv/agent/internal/codex/service"
+	"multienv/agent/codex/service"
 )
 
 type App struct {

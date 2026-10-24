@@ -5,7 +5,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"multienv/agent/internal/doctor/service"
+	"multienv/agent/doctor/service"
 )
 
 func NewCommand(configPath *string) *cobra.Command {

@@ -6,7 +6,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"multienv/agent/internal/tmux/service"
+	"multienv/agent/tmux/service"
 )
 
 func newRenameSessionCmd(app *App) *cobra.Command {

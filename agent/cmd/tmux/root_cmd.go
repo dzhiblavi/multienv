@@ -5,10 +5,10 @@ import (
 
 	"github.com/spf13/cobra"
 
-	agenthttp "multienv/agent/internal/client/agent/http"
-	"multienv/agent/internal/config"
-	"multienv/agent/internal/tmux/client/http"
-	"multienv/agent/internal/tmux/service"
+	agenthttp "multienv/agent/client/agent/http"
+	"multienv/agent/config"
+	"multienv/agent/tmux/client/http"
+	"multienv/agent/tmux/service"
 	"multienv/common/util"
 )
 

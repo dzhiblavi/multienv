@@ -6,7 +6,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"multienv/agent/internal/codex/service"
+	"multienv/agent/codex/service"
 )
 
 func newUnarchiveSessionCmd(app *App) *cobra.Command {
