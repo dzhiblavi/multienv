@@ -25,17 +25,16 @@ require the server to run on macOS.
 | --- | --- |
 | Building | Go 1.25.14 or newer, Make |
 | Each managed host | tmux, `multienv-agent` |
-| Each host running the dashboard | Bash 4+, jq, recent fzf, `realpath`, standard Unix tools |
-| Workstation launcher and forwarder | Bash 4+, SSH client, jq |
-| Switching between hosts | OpenBSD-compatible `nc` with `-k` support on the workstation and TUI hosts |
+| Each host running the dashboard | `multienv-tui`, tmux |
+| Workstation launcher and forwarder | Bash 4+, SSH client, jq; launcher also needs Mike Farah's `yq` |
+| Switching between hosts | OpenBSD-compatible `nc` with `-k` support on the workstation |
 | Remote hosts | SSH server, reachable from the master with noninteractive authentication |
 | Server | SSH client, Redis with JSON command support; the bundled setup uses Redis 8.2 |
 | Bundled Redis setup | Docker Compose, OpenSSL, `shasum` |
 | Desktop commands, optional | macOS on the server host, with `osascript` and `/usr/bin/open` |
 | macOS background services, optional | launchd, jq, Mike Farah's `yq`, `jinja2` CLI |
 
-Use tmux 3.3+ for popup support. fzf must support `--tmux`, `--id-nth` and the
-`every(...)` binding; the current UI has been used with fzf 0.74.4.
+Use tmux 3.3+ for popup support.
 
 For optional Codex integration, install `lsof` and a Codex CLI with `--no-daemon`,
 `resume`, `archive`, `unarchive` and `delete` commands, and compatible local session
@@ -66,8 +65,8 @@ mkdir -p ~/.bin ~/.config/multienv
 make -C deploy remote
 ```
 
-This builds the Go binaries into `~/.bin` and links the shell programs to the
-checkout. Keep the checkout in place while those links are installed. Add `~/.bin`
+This builds the binaries into `~/.bin` and links the launcher to the checkout.
+Keep the checkout in place while the launcher link is installed. Add `~/.bin`
 to `PATH` in your shell configuration. On macOS, also put your installed Bash 4+
 ahead of `/usr/bin`; for an Apple Silicon Homebrew installation, for example:
 
@@ -201,12 +200,15 @@ SSH server must allow TCP forwarding.
 
 ### 6. Configure the terminal UI
 
-Create `~/.config/multienv/tui.sh` on hosts where you use the terminal programs:
+Create `~/.config/multienv/tui.yaml` on hosts where you use the terminal programs:
 
-```bash
-c_host_alias_to_hostname[mac]=macbook
-c_host_alias_to_hostname[dev]=devbox
-c_ctrl_port=12400
+```yaml
+host_aliases:
+  mac: macbook
+  dev: devbox
+
+tmux:
+  control_port: 12400
 ```
 
 These aliases label hosts in the UI. The workstation launcher also uses them for
@@ -315,7 +317,7 @@ multienv-tui --no-popup      # Use the current pane instead of a popup
 multienv-tui --help
 ```
 
-The Go TUI runs from the checkout with `go run ./tui/cmd`, or install it with
+The TUI runs from the checkout with `go run ./tui/cmd`, or install it with
 `make -C deploy install-tui` and run `multienv-tui [tmux|codex|doctor]`.
 Use `--no-popup` for the current pane and `--doctor` for a diagnostic report.
 It reads `~/.config/multienv/tui.yaml`; `--config` overrides only this TUI file.
@@ -331,7 +333,7 @@ popup:
   width: 90%
   height: 90%
 
-log_file: /tmp/multienv-tui-go.log
+log_file: /tmp/multienv-tui.log
 
 keybindings:
   switch-view: [ctrl+b]
@@ -354,7 +356,7 @@ codex:
     delete: [ctrl+x]
 ```
 
-The Go TUI uses Go regular expressions in the ignore file.
+The TUI uses Go regular expressions in the ignore file.
 Key bindings map action names to lists of lowercase key names. Omitted actions use their defaults;
 an empty list disables an action. Root bindings are shared; `tmux`, `codex` and `doctor` can override them.
 The control port must match the launcher.
@@ -461,19 +463,19 @@ whitespace and `#` are comments. Rules are reread on refresh. For example:
 ^[^\t]*\t[^\t]*\tscratch:
 ```
 
-Rules match the full row with colors and the activity indicator removed; its first
-three tab-separated fields are state, host alias and title. Rules can also match the
-hostname, ID and encoded session data that follow. Use anchors to target the visible
-fields.
+Rules match three tab-separated fields: state, host alias and title.
 
-Override the ignore file or shell log path in `tui.sh`:
+Override the ignore file or log path in `tui.yaml`:
 
-```bash
-c_tui_ignore_file_path="${HOME}/.config/multienv/custom-ignore"
-c_log_file_path="/tmp/multienv-tui.log"
+```yaml
+log_file: /tmp/multienv-tui.log
+
+codex:
+  ignore_file: ~/.config/multienv/custom-ignore
 ```
 
-Agent output and UI errors are appended to `/tmp/multienv-tui-last-run.log`.
+TUI errors are appended to the configured log file, `/tmp/multienv-tui.log` by default.
+Launcher logs are written to `/tmp/multienv-launcher.log`.
 For stale remote sessions, check server logs, SSH access from the master, and
 `multienv-agent tmux list-local` on the affected host.
 
@@ -588,8 +590,8 @@ refer to the master, so remote files must be accessible there to open them.
 ```mermaid
 flowchart LR
     TUI["TUI on any host"] -->|HTTP over SSH tunnels| Server["Server on master"]
-    Server -->|SSH commands| Agents["Agents on managed hosts"]
-    Agents -->|HTTP snapshots| Server
+    Server -->|Commands| Agents["Agents on managed hosts"]
+    Agents -->|"State snapshots"| Server
     Server --> Redis["Redis snapshots"]
     TUI -->|Switch request| Launcher["Workstation launcher"]
     Launcher -->|Local attach or SSH| Sessions["tmux sessions"]
@@ -605,9 +607,8 @@ commands, and master desktop commands. Agents communicate with the server using
 HTTP and JSON.
 
 The **TUI** uses Go and Bubble Tea and calls the agent services directly.
-The Bash/fzf version remains in `tui/bin/multienv-tui`. While open, the TUI requests
-synchronization and refreshes its view. Each snapshot records when it was taken, so unavailable hosts
-remain recognizable by their stale data.
+While open, the TUI requests synchronization and refreshes its view. Each snapshot
+records when it was taken, so unavailable hosts remain recognizable by their stale data.
 
 The **launcher** owns the interactive terminal connection. A cross-host selection
 sends a request back to it, and it attaches to the chosen tmux target locally or

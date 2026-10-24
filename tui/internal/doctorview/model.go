@@ -113,7 +113,7 @@ func WithConfig(report model.Report, err error) model.Report {
 		check.Message = err.Error()
 	}
 
-	host := model.HostReport{Hostname: hostname, Source: "go-tui", Checks: []model.Check{check}}
+	host := model.HostReport{Hostname: hostname, Source: "tui", Checks: []model.Check{check}}
 	report.Hosts = append([]model.HostReport{host}, report.Hosts...)
 	return report
 }

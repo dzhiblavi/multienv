@@ -18,7 +18,7 @@ func Popup(ctx context.Context, settings config.Popup, args []string) (*Action, 
 		return nil, err
 	}
 
-	directory, err := os.MkdirTemp("", "multienv-tui-go.")
+	directory, err := os.MkdirTemp("", "multienv-tui.")
 	if err != nil {
 		return nil, err
 	}

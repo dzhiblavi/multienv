@@ -44,7 +44,7 @@ func (c *Config) Default() {
 	c.Tmux.ControlPort = 7777
 	c.Popup = Popup{Enabled: true, Width: "90%", Height: "90%"}
 	c.Codex.IgnoreFile = "~/.config/multienv/.multienv-tui-ignore"
-	c.LogFile = filepath.Join(os.TempDir(), "multienv-tui-go.log")
+	c.LogFile = filepath.Join(os.TempDir(), "multienv-tui.log")
 }
 
 func Expand(path string) (string, error) {

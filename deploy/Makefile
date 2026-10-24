@@ -1,7 +1,7 @@
 BUILD_FLAGS=-ldflags="-s -w" -trimpath
 INSTALL_DIR=~/.bin
 MAKEFILE_DIR := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
-TUI_BIN := $(MAKEFILE_DIR)/../tui/bin
+LAUNCHER_BIN := $(MAKEFILE_DIR)/../launcher/bin
 
 install-server:
 	@go build $(BUILD_FLAGS) \
@@ -21,10 +21,10 @@ install-tui:
 		$(MAKEFILE_DIR)/../tui/cmd \
 		&& echo "install multienv-tui $(shell hostname) OK"
 
-link-%:
+install-launcher:
 	@ln -sf \
-		$(TUI_BIN)/$* $(INSTALL_DIR)/$* \
-		&& echo "install tui/$* $(shell hostname) OK"
+		$(LAUNCHER_BIN)/multienv $(INSTALL_DIR)/multienv \
+		&& echo "install multienv $(shell hostname) OK"
 
 sync:
 	@rsync -av --delete --exclude=.git --filter=':- .gitignore' \
@@ -33,6 +33,7 @@ sync:
 local:
 	$(MAKE) install-agent # install ~/.bin/multienv-agent
 	$(MAKE) install-server # install ~/.bin/multienv-server
+	$(MAKE) install-launcher # install ~/.bin/multienv
 	$(MAKE) install-tui # install ~/.bin/multienv-tui
 
 remote:

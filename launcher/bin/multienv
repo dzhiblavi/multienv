@@ -1,0 +1,80 @@
+#!/usr/bin/env bash
+
+if ((BASH_VERSINFO[0] < 4)); then
+    printf 'multienv requires Bash 4 or newer first in PATH\n' >&2
+    exit 1
+fi
+
+config_path="${HOME}/.config/multienv/tui.yaml"
+log_file_path="/tmp/multienv-launcher.log"
+control_port=7777
+declare -A hostname_to_alias=()
+
+log() {
+    printf '[%s] %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$*" >>"${log_file_path}"
+}
+
+read_config() {
+    [[ -f "${config_path}" ]] || return 0
+
+    local config aliases
+    config="$(yq -o=json '.' "${config_path}")" || return
+    control_port="$(jq -er '.tmux.control_port // 7777 |
+        if type == "number" and . == floor and . >= 1 and . <= 65535 then .
+        else error("tmux.control_port must be an integer between 1 and 65535") end' <<<"${config}")" || return
+
+    aliases="$(jq -r '.host_aliases // {} | to_entries |
+        if all(.[]; (.key | length) > 0 and (.value | type) == "string" and (.value | length) > 0)
+        then .[] | [.value, .key] | @tsv
+        else error("invalid host aliases") end' <<<"${config}")" || return
+
+    local hostname alias
+    while IFS=$'\t' read -r hostname alias; do
+        [[ -n "${hostname}" ]] && hostname_to_alias["${hostname}"]="${alias}"
+    done <<<"${aliases}"
+
+    return 0
+}
+
+attach() {
+    local hostname="${1:?need hostname}"
+    local target="${2:?need target}"
+
+    if [[ "$(hostname)" == "${hostname}" ]]; then
+        tmux attach -t "${target}"
+    else
+        local alias="${hostname_to_alias[${hostname}]:-${hostname}}"
+        local command
+        printf -v command '%q ' tmux attach -t "${target}"
+
+        log "attaching to ${hostname}:${target} through ${alias}"
+        ssh -t -- "${alias}" "${command}"
+    fi
+}
+
+listen() {
+    log "endpoint=localhost:${control_port}"
+
+    local hostname target
+    while IFS=$'\t' read -r hostname target; do
+        [[ -n "${hostname}" && -n "${target}" ]] || continue
+
+        log "received ${hostname}, ${target}"
+        attach "${hostname}" "${target}" </dev/tty &
+    done < <(nc -kl 127.0.0.1 "${control_port}")
+}
+
+cleanup() {
+    local children
+    children="$(jobs -pr)"
+    [[ -z "${children}" ]] || kill ${children} 2>/dev/null
+}
+
+read_config || exit 1
+trap cleanup SIGINT SIGTERM EXIT
+
+initial_session="${1:?need initial session}"
+initial_host="${2:-$(hostname)}"
+attach "${initial_host}" "${initial_session}" </dev/tty &
+
+listen
