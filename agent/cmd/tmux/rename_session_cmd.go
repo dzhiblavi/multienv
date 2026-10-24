@@ -6,7 +6,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	agent "multienv/agent/internal/tmuxagent"
+	"multienv/agent/internal/tmux/service"
 )
 
 func newRenameSessionCmd(app *App) *cobra.Command {
@@ -15,7 +15,7 @@ func newRenameSessionCmd(app *App) *cobra.Command {
 		Short: "rename a session in the workspace",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			var params agent.RenameSessionParams
+			var params service.RenameSessionParams
 			if err := json.NewDecoder(cmd.InOrStdin()).Decode(&params); err != nil {
 				return fmt.Errorf("failed to decode request: %v", err)
 			}

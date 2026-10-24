@@ -6,7 +6,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	agent "multienv/agent/internal/codexagent"
+	"multienv/agent/internal/codex/service"
 )
 
 func newUnarchiveSessionCmd(app *App) *cobra.Command {
@@ -15,7 +15,7 @@ func newUnarchiveSessionCmd(app *App) *cobra.Command {
 		Short: "unarchive session in the workspace",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			var params agent.UnarchiveSessionParams
+			var params service.UnarchiveSessionParams
 			if err := json.NewDecoder(cmd.InOrStdin()).Decode(&params); err != nil {
 				return fmt.Errorf("failed to decode request: %v", err)
 			}

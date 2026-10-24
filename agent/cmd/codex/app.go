@@ -1,9 +1,9 @@
 package codex
 
 import (
-	agent "multienv/agent/internal/codexagent"
+	"multienv/agent/internal/codex/service"
 )
 
 type App struct {
-	Agent *agent.Agent
+	Agent *service.Agent
 }

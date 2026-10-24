@@ -6,7 +6,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	agent "multienv/agent/internal/tmuxagent"
+	"multienv/agent/internal/tmux/service"
 )
 
 func newNewWindowCmd(app *App) *cobra.Command {
@@ -15,7 +15,7 @@ func newNewWindowCmd(app *App) *cobra.Command {
 		Short: "create a window in a tmux session in the workspace",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			var params agent.NewWindowParams
+			var params service.NewWindowParams
 			if err := json.NewDecoder(cmd.InOrStdin()).Decode(&params); err != nil {
 				return fmt.Errorf("failed to decode request: %w", err)
 			}

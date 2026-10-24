@@ -6,9 +6,9 @@ import (
 	"github.com/spf13/cobra"
 
 	"multienv/common/util"
+	"multienv/server/internal/agent"
 	"multienv/server/internal/codex"
 	"multienv/server/internal/doctor"
-	"multienv/server/internal/filesystem"
 	"multienv/server/internal/httpserver"
 	"multienv/server/internal/master"
 	"multienv/server/internal/storage"
@@ -62,7 +62,8 @@ func newRootCmd() *cobra.Command {
 				app.Close()
 				return fmt.Errorf("initialize tmux storage: %w", err)
 			}
-			tmuxDispatcher := tmux.New(config.Tmux, tmuxStorage)
+			agentDispatcher := agent.New()
+			tmuxDispatcher := tmux.New(config.Tmux, tmuxStorage, agentDispatcher)
 
 			codexStorage, err := redisstorage.New(ctx, config.Storage, "@codex")
 			if err != nil {
@@ -74,7 +75,7 @@ func newRootCmd() *cobra.Command {
 				app.Close()
 				return fmt.Errorf("initialize codex storage: %w", err)
 			}
-			codexDispatcher := codex.New(config.Codex, codexStorage)
+			codexDispatcher := codex.New(config.Codex, codexStorage, agentDispatcher)
 
 			hosts := append(append([]string{}, config.Tmux.Hosts...), config.Codex.Hosts...)
 			diagnostics, err := doctor.New(hosts, map[string]doctor.SnapshotReader{
@@ -86,7 +87,7 @@ func newRootCmd() *cobra.Command {
 			}
 
 			app.server = httpserver.New(config.Server)
-			if err := app.server.InstallQueries("doctor", doctor.NewDispatcher(diagnostics)); err != nil {
+			if err := app.server.Install("doctor", doctor.NewDispatcher(diagnostics)); err != nil {
 				app.Close()
 				return fmt.Errorf("install doctor: %w", err)
 			}
@@ -106,9 +107,9 @@ func newRootCmd() *cobra.Command {
 				return fmt.Errorf("install master dispatcher: %w", err)
 			}
 
-			if err := app.server.Install("filesystem", filesystem.New()); err != nil {
+			if err := app.server.Install("agent", agentDispatcher); err != nil {
 				app.Close()
-				return fmt.Errorf("install filesystem dispatcher: %w", err)
+				return fmt.Errorf("install agent dispatcher: %w", err)
 			}
 
 			return nil

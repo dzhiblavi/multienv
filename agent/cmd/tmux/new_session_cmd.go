@@ -6,7 +6,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	agent "multienv/agent/internal/tmuxagent"
+	"multienv/agent/internal/tmux/service"
 )
 
 func newNewSessionCmd(app *App) *cobra.Command {
@@ -15,7 +15,7 @@ func newNewSessionCmd(app *App) *cobra.Command {
 		Short: "create a new session in the workspace",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			var params agent.NewSessionParams
+			var params service.NewSessionParams
 			if err := json.NewDecoder(cmd.InOrStdin()).Decode(&params); err != nil {
 				return fmt.Errorf("failed to decode request: %v", err)
 			}

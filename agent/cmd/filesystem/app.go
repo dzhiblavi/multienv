@@ -1,7 +1,7 @@
 package filesystem
 
-import agent "multienv/agent/internal/filesystemagent"
+import "multienv/agent/internal/filesystem/service"
 
 type App struct {
-	Agent *agent.Agent
+	Agent *service.Agent
 }

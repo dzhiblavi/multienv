@@ -6,7 +6,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	agent "multienv/agent/internal/tmuxagent"
+	"multienv/agent/internal/tmux/service"
 )
 
 func newKillWindowCmd(app *App) *cobra.Command {
@@ -15,7 +15,7 @@ func newKillWindowCmd(app *App) *cobra.Command {
 		Short: "kill a window in the workspace",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			var params agent.KillWindowParams
+			var params service.KillWindowParams
 			if err := json.NewDecoder(cmd.InOrStdin()).Decode(&params); err != nil {
 				return fmt.Errorf("failed to decode request: %w", err)
 			}

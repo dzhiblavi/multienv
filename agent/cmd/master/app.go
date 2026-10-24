@@ -1,7 +1,7 @@
 package master
 
-import agent "multienv/agent/internal/masteragent"
+import "multienv/agent/internal/master/service"
 
 type App struct {
-	Agent *agent.Agent
+	Agent *service.Agent
 }

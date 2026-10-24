@@ -5,9 +5,9 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"multienv/agent/internal/client/filesystem/http"
+	"multienv/agent/internal/client/agent/http"
 	"multienv/agent/internal/config"
-	agent "multienv/agent/internal/filesystemagent"
+	"multienv/agent/internal/filesystem/service"
 	"multienv/common/util"
 )
 
@@ -22,7 +22,7 @@ func NewCommand(configPath *string) *cobra.Command {
 				return fmt.Errorf("failed to parse config: %w", err)
 			}
 
-			instance, err := agent.New(http.New(cfg.Client))
+			instance, err := service.New(http.New(cfg.Client))
 			if err != nil {
 				return err
 			}

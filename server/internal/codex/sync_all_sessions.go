@@ -4,6 +4,7 @@ import (
 	"context"
 	"sync"
 
+	agentoperations "multienv/common/agent/operations"
 	"multienv/common/codex/operations"
 	"multienv/common/log"
 )
@@ -21,12 +22,13 @@ func (s Dispatcher) SyncAllSessions(
 			ctx := log.WithCustomLogData(ctx, "host", host)
 			log.Info(ctx, "syncing host")
 
-			req := operations.ForwardAgentRequest{
+			req := agentoperations.ForwardRequest{
 				Hostname: host,
+				Domain:   "codex",
 				Command:  "sync-local",
 			}
 
-			_, err := s.ForwardAgent(ctx, req)
+			_, err := s.forwarder.Forward(ctx, req)
 			if err != nil {
 				log.Error(ctx, "failed to sync host", "error", err)
 			}

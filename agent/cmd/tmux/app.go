@@ -1,9 +1,9 @@
 package tmux
 
 import (
-	agent "multienv/agent/internal/tmuxagent"
+	"multienv/agent/internal/tmux/service"
 )
 
 type App struct {
-	Agent *agent.Agent
+	Agent *service.Agent
 }

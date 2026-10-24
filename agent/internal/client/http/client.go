@@ -9,7 +9,6 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
-	"time"
 )
 
 type Client struct {
@@ -42,18 +41,13 @@ func (c Client) Post(
 		return err
 	}
 
-	return c.send(ctx, http.MethodPost, "/"+domain, bytes.NewReader(body), c.config.Timeout, dst)
-}
-
-func (c Client) Get(ctx context.Context, path string, timeout time.Duration, dst any) error {
-	return c.send(ctx, http.MethodGet, path, nil, timeout, dst)
+	return c.send(ctx, "/"+domain, bytes.NewReader(body), dst)
 }
 
 func (c Client) send(
 	ctx context.Context,
-	method, path string,
+	path string,
 	body io.Reader,
-	timeout time.Duration,
 	dst any,
 ) error {
 	endpoint, err := url.Parse(c.config.URL)
@@ -62,25 +56,15 @@ func (c Client) send(
 	}
 
 	endpoint.Path = strings.TrimRight(endpoint.Path, "/") + path
-	req, err := http.NewRequestWithContext(ctx, method, endpoint.String(), body)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint.String(), body)
 	if err != nil {
 		return fmt.Errorf("create request: %w", err)
 	}
 
 	req.Header.Set("Accept", "application/json")
-	if body != nil {
-		req.Header.Set("Content-Type", "application/json")
-	}
+	req.Header.Set("Content-Type", "application/json")
 
-	client := *c.client
-	client.Timeout = timeout
-	if method == http.MethodGet {
-		client.CheckRedirect = func(*http.Request, []*http.Request) error {
-			return http.ErrUseLastResponse
-		}
-	}
-
-	resp, err := client.Do(req)
+	resp, err := c.client.Do(req)
 	if err != nil {
 		return fmt.Errorf("send request: %w", err)
 	}

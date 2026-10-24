@@ -6,7 +6,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	agent "multienv/agent/internal/codexagent"
+	"multienv/agent/internal/codex/service"
 )
 
 func newPrepareResumeCmd(app *App) *cobra.Command {
@@ -15,7 +15,7 @@ func newPrepareResumeCmd(app *App) *cobra.Command {
 		Short: "unarchive and validate a session before resuming it",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			var params agent.PrepareResumeParams
+			var params service.PrepareResumeParams
 			if err := json.NewDecoder(cmd.InOrStdin()).Decode(&params); err != nil {
 				return fmt.Errorf("failed to decode request: %w", err)
 			}

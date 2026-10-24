@@ -5,7 +5,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	local "multienv/agent/internal/doctoragent"
+	"multienv/agent/internal/doctor/service"
 )
 
 func NewCommand(configPath *string) *cobra.Command {
@@ -29,9 +29,9 @@ func NewCommand(configPath *string) *cobra.Command {
 					return fmt.Errorf("unknown format %q: use human or json", format)
 				}
 
-				collect := local.Global
+				collect := service.Global
 				if scope == "local" {
-					collect = local.Local
+					collect = service.Local
 				}
 
 				result := collect(cmd.Context(), *configPath)

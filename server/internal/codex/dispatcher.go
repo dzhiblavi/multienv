@@ -7,17 +7,19 @@ import (
 
 	"multienv/common/codex/operations"
 	"multienv/common/log"
+	"multienv/server/internal/agent"
 	"multienv/server/internal/dispatcher"
 	"multienv/server/internal/storage"
 )
 
 type Dispatcher struct {
-	config  Config
-	storage storage.Storage
+	config    Config
+	storage   storage.Storage
+	forwarder agent.Forwarder
 }
 
-func New(config Config, storage storage.Storage) Dispatcher {
-	return Dispatcher{config, storage}
+func New(config Config, storage storage.Storage, forwarder agent.Forwarder) Dispatcher {
+	return Dispatcher{config: config, storage: storage, forwarder: forwarder}
 }
 
 func (s Dispatcher) Dispatch(ctx context.Context, payload string) (any, error) {
@@ -58,13 +60,6 @@ func (s Dispatcher) Dispatch(ctx context.Context, payload string) (any, error) {
 			return nil, dispatcher.ErrInvalidParams
 		}
 		return s.DeleteSession(ctx, req)
-
-	case "forward-agent":
-		var req operations.ForwardAgentRequest
-		if err := json.Unmarshal(env.Request, &req); err != nil {
-			return nil, dispatcher.ErrInvalidParams
-		}
-		return s.ForwardAgent(ctx, req)
 
 	case "sync-all":
 		var req operations.SyncAllSessionsRequest

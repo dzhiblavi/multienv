@@ -35,17 +35,6 @@ func handler(
 	dispatch(disp, w, r, string(bodyBytes))
 }
 
-func makeQueryHandler(disp dispatcher.Dispatcher) http.HandlerFunc {
-	return AccessLogMiddleware()(func(w http.ResponseWriter, r *http.Request) {
-		payload, _ := json.Marshal(struct {
-			Action  string   `json:"action"`
-			Request struct{} `json:"request"`
-		}{Action: r.PathValue("action")})
-
-		dispatch(disp, w, r, string(payload))
-	})
-}
-
 func dispatch(disp dispatcher.Dispatcher, w http.ResponseWriter, r *http.Request, payload string) {
 	w.Header().Set("Content-Type", "application/json")
 
