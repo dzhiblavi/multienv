@@ -315,6 +315,50 @@ multienv-tui --no-popup      # Use the current pane instead of a popup
 multienv-tui --help
 ```
 
+The Go TUI runs from the checkout with `go run ./tui/cmd`, or install it with
+`make -C deploy install-tui` and run `multienv-tui [tmux|codex|doctor]`.
+Use `--no-popup` for the current pane and `--doctor` for a diagnostic report.
+It reads `~/.config/multienv/tui.yaml`; `--config` overrides only this TUI file.
+The agent configuration is always read from `~/.config/multienv/agent.yaml`.
+
+```yaml
+host_aliases:
+  mac: macbook
+  dev: devbox
+
+popup:
+  enabled: true
+  width: 90%
+  height: 90%
+
+log_file: /tmp/multienv-tui-go.log
+
+keybindings:
+  switch-view: [ctrl+b]
+  doctor: [ctrl+/, ctrl+_, f1]
+
+tmux:
+  control_port: 12400
+  remote_pane_preview: false
+  keybindings:
+    create: [ctrl+n]
+    rename: [ctrl+r]
+    move-window: [ctrl+o]
+    delete: [ctrl+x]
+
+codex:
+  ignore_file: ~/.config/multienv/.multienv-tui-ignore
+  keybindings:
+    archive: [ctrl+a]
+    unarchive: [ctrl+u]
+    delete: [ctrl+x]
+```
+
+The Go TUI uses Go regular expressions in the ignore file.
+Key bindings map action names to lists of lowercase key names. Omitted actions use their defaults;
+an empty list disables an action. Root bindings are shared; `tmux`, `codex` and `doctor` can override them.
+The control port must match the launcher.
+
 Run the dashboard inside tmux. Type to search, use arrow keys or Ctrl-J/Ctrl-K to
 move, and press Enter to open the current item. Tab marks sessions for batch actions;
 Enter always opens just the current item. `?` toggles the help header. Ctrl-B switches
@@ -334,16 +378,15 @@ to the dashboard; with the default bindings, press Ctrl-B twice.
 
 Sessions are ordered by their last attachment time across all hosts, newest first.
 Each row shows the host, window count, command and directory of the active window's
-active pane. Home paths are shortened to `~`; long paths show their trailing portion.
+active pane.
 
 - A green `●` means at least one client is attached.
 - A red `!` means the snapshot is older than 30 seconds and takes precedence over the dot.
-- The right pane lists windows by index, one line each, with a green dot on the active
-  window. The command is omitted when it matches the window name.
+- The right pane lists windows by index, one line each, with a dot on the active window.
 - The active pane's contents appear below the window list when available. The
   preview follows the selected window when the window list has focus and refreshes
   every three seconds. Remote previews are disabled by default; set
-  `c_remote_pane_preview=1` in `tui.sh` to enable them.
+  `tmux.remote_pane_preview: true` in `tui.yaml` to enable them.
 
 | Key | Action |
 | --- | --- |
@@ -384,7 +427,8 @@ The list shows an activity indicator, state, host and conversation title. A gree
 means the session has a mapped tmux pane. A red `!` means the snapshot is older than
 30 seconds and takes precedence over the dot. `Working (bg)` identifies active work
 without a mapped tmux pane. The preview includes the working directory, first and
-latest messages, and snapshot age. Snapshot ages over 10 seconds are red in the preview.
+latest messages, and snapshot age. Conversations are ordered by state:
+ActionRequired, Idle, Working, Not Loaded, Unknown, Archived.
 
 | Key | Action |
 | --- | --- |
@@ -401,13 +445,13 @@ a window for it. With `--no-popup`, resuming a local session replaces the dashbo
 in the current pane. Archive and delete operations also close an associated tmux
 pane when one is found.
 
-Archived and ignored sessions are hidden initially. The prompt uses `+a`/`-a` for
-archived visibility and `+i`/`-i` for ignored visibility; the toggles are independent.
+Archived and ignored sessions are hidden initially. Their visibility is shown in the title;
+the toggles are independent.
 
 ### Ignore rules and logs
 
 Codex ignore rules live in `~/.config/multienv/.multienv-tui-ignore`. Each nonempty
-line is a case-sensitive jq regular expression; lines beginning with optional
+line is a case-sensitive Go regular expression; lines beginning with optional
 whitespace and `#` are comments. Rules are reread on refresh. For example:
 
 ```text
@@ -560,8 +604,9 @@ actions. It is one Go binary with a tmux command tree, additional Codex integrat
 commands, and master desktop commands. Agents communicate with the server using
 HTTP and JSON.
 
-The **TUI** is a Bash/fzf interface. While open, it requests synchronization and
-refreshes its view. Each snapshot records when it was taken, so unavailable hosts
+The **TUI** uses Go and Bubble Tea and calls the agent services directly.
+The Bash/fzf version remains in `tui/bin/multienv-tui`. While open, the TUI requests
+synchronization and refreshes its view. Each snapshot records when it was taken, so unavailable hosts
 remain recognizable by their stale data.
 
 The **launcher** owns the interactive terminal connection. A cross-host selection

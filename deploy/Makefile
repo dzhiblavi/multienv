@@ -15,6 +15,12 @@ install-agent:
 		$(MAKEFILE_DIR)/../agent/cmd \
 		&& echo "install multienv-agent $(shell hostname) OK"
 
+install-tui:
+	@go build $(BUILD_FLAGS) \
+		-o $(INSTALL_DIR)/multienv-tui \
+		$(MAKEFILE_DIR)/../tui/cmd \
+		&& echo "install multienv-tui $(shell hostname) OK"
+
 link-%:
 	@ln -sf \
 		$(TUI_BIN)/$* $(INSTALL_DIR)/$* \
@@ -27,12 +33,11 @@ sync:
 local:
 	$(MAKE) install-agent # install ~/.bin/multienv-agent
 	$(MAKE) install-server # install ~/.bin/multienv-server
-	$(MAKE) link-multienv # install workspace entrypoint ~/.bin/multienv
-	$(MAKE) link-multienv-tui # install workspace TUI ~/.bin/multienv-tui
+	$(MAKE) install-tui # install ~/.bin/multienv-tui
 
 remote:
 	$(MAKE) install-agent # install ~/.bin/multienv-agent
-	$(MAKE) link-multienv-tui # install workspace TUI ~/.bin/multienv-tui
+	$(MAKE) install-tui # install ~/.bin/multienv-tui
 
 remote-ssh: sync
 	ssh dev-vm make -C /home/dzhiblavi/tools/multienv/deploy remote
