@@ -1,6 +1,7 @@
 # Installation
 
 Requires Go 1.25.14+ and Make. Run commands from the repository root.
+See the [setup guide](../docs/install.md) for configuration and first launch.
 
 ```sh
 mkdir -p ~/.bin
