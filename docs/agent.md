@@ -85,6 +85,7 @@ Each of these takes `hostname` and `session_id`:
 
 | Command | Purpose |
 | --- | --- |
+| `rename-session` | Rename the conversation; also requires `new_name` |
 | `archive-session` | Archive the conversation and close its mapped tmux pane |
 | `unarchive-session` | Make the conversation available again |
 | `delete-session` | Delete the conversation and close its mapped tmux pane |

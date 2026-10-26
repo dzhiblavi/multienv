@@ -33,6 +33,7 @@ func Tmux() Bindings {
 
 func Codex() Bindings {
 	return Bindings{
+		"rename":          {"ctrl+r"},
 		"archive":         {"ctrl+a"},
 		"unarchive":       {"ctrl+u"},
 		"delete":          {"ctrl+x"},

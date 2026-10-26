@@ -83,7 +83,10 @@ func getAllCodexSessions(ctx context.Context) (model.SessionsById, error) {
 			select id, coalesce(source, ''), coalesce(archived, 0), coalesce(cwd, ''),
 				coalesce(first_user_message, ''),
 				substr(replace(replace(replace(replace(
-					coalesce(nullif(name, ''), nullif(title, ''), nullif(preview, ''), ''),
+					case when history_mode = 'legacy'
+						then coalesce(nullif(title, ''), nullif(name, ''), nullif(preview, ''), '')
+						else coalesce(nullif(name, ''), nullif(title, ''), nullif(preview, ''), '')
+					end,
 					char(9), ' '), char(10), ' '), char(13), ' '), char(27), ''), 1, 100)
 			from threads
 		`

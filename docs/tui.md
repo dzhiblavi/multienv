@@ -40,6 +40,7 @@ tmux:
 codex:
   ignore_file: ~/.config/multienv/.multienv-tui-ignore
   keybindings:
+    rename: [ctrl+r]
     archive: [ctrl+a]
     unarchive: [ctrl+u]
     delete: [ctrl+x]
@@ -144,6 +145,7 @@ ActionRequired, Idle, Working, Not Loaded, Unknown, Archived.
 | Key | Action |
 | --- | --- |
 | Enter | Switch to a running session's pane or prepare and resume an inactive session |
+| Ctrl-R | Rename the current conversation |
 | Ctrl-A | Archive marked sessions, or the current session |
 | Ctrl-U | Unarchive marked sessions, or the current session |
 | Ctrl-X | Delete marked sessions, or the current session |

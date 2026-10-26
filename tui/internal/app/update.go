@@ -151,6 +151,8 @@ func (m *model) domainKey(action string) (tea.Cmd, bool) {
 
 func (m *model) codexKeyAction(action string) (tea.Cmd, bool) {
 	switch action {
+	case "rename":
+		return m.renameCodex(), true
 	case "archive":
 		return m.codexAction("archive"), true
 	case "unarchive":

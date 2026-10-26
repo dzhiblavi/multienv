@@ -80,7 +80,7 @@ func (m *model) helpText() string {
 	case Doctor:
 		actions = []string{"previous", "next", "preview-up", "preview-down", "refresh", "quit"}
 	case Codex:
-		actions = append(actions, "archive", "unarchive", "delete", "toggle-archived", "toggle-ignored")
+		actions = append(actions, "rename", "archive", "unarchive", "delete", "toggle-archived", "toggle-ignored")
 	default:
 		actions = append(actions, "focus-windows", "focus-sessions", "previous-window", "next-window",
 			"create", "rename", "move-window", "delete")

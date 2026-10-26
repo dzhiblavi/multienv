@@ -43,6 +43,7 @@ func NewCommand(configPath *string) *cobra.Command {
 	cmd.AddCommand(newSyncLocalCmd(&app))
 	cmd.AddCommand(newSyncAllCmd(&app))
 	cmd.AddCommand(newDeleteSessionCmd(&app))
+	cmd.AddCommand(newRenameSessionCmd(&app))
 	cmd.AddCommand(newArchiveSessionCmd(&app))
 	cmd.AddCommand(newUnarchiveSessionCmd(&app))
 	cmd.AddCommand(newPrepareResumeCmd(&app))
