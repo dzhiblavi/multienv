@@ -5,7 +5,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
-	tmuxservice "multienv/agent/tmux/service"
+	tmuxservice "multienv/agent/domains/tmux/service"
 )
 
 type previewLoaded struct {

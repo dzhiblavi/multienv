@@ -28,7 +28,7 @@ Use actual hostnames in `hosts`; the server also uses these names for SSH.
 `@master` can represent the server host in this list. If omitted, `hosts` defaults to the server's own hostname.
 The `@all` invocation alias selects these hosts; duplicate targets are executed once.
 It invokes `multienv-agent` from PATH on remote hosts.
-Generic command execution uses `POST /host` with action `invoke`; see [agent invoke](agent.md#invoke).
+Generic command execution uses `POST /host` with action `invoke`; see [agent host commands](agent.md#host-commands).
 JSON storage uses `POST /storage`; see [storage operations](storage.md).
 
 The HTTP endpoint defaults to `127.0.0.1:12123`; this example explicitly uses `12401`.

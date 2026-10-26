@@ -9,7 +9,7 @@ import (
 	"charm.land/bubbles/v2/viewport"
 	tea "charm.land/bubbletea/v2"
 
-	"multienv/agent/tmux/model"
+	"multienv/agent/domains/tmux/model"
 	"multienv/tui/internal/browser"
 	"multienv/tui/internal/config"
 	"multienv/tui/internal/display"

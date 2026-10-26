@@ -1,0 +1,45 @@
+package service
+
+import (
+	"context"
+	"fmt"
+
+	agentclient "multienv/agent/client/agent"
+	"multienv/agent/domains/tmux/local"
+	"multienv/agent/domains/tmux/model"
+)
+
+type NewSessionParams struct {
+	Name     string `json:"name"`
+	Hostname string `json:"hostname"`
+}
+
+func (a Agent) NewSession(ctx context.Context, params NewSessionParams) (*model.Session, error) {
+	if params.Hostname == a.hostname {
+		return a.newLocalSession(ctx, params.Name)
+	} else {
+		return a.newRemoteSession(ctx, params)
+	}
+}
+
+func (a Agent) newLocalSession(ctx context.Context, name string) (*model.Session, error) {
+	session, err := local.NewSession(ctx, name)
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to create a new session: %v", err)
+	}
+
+	err = a.publishSession(ctx, session)
+	return &session, err
+}
+
+func (a Agent) newRemoteSession(ctx context.Context, params NewSessionParams) (*model.Session, error) {
+	session, err := agentclient.InvokeDecode[model.Session](
+		ctx, a.hostClient, params.Hostname, "tmux", "new-session", params,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	return &session, nil
+}

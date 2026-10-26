@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"multienv/agent/host/client"
+	"multienv/agent/domains/host/client"
 	"multienv/common/host/model"
 	"multienv/common/host/operations"
 	"multienv/common/subprocess"

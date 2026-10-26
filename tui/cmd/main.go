@@ -10,7 +10,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	doctorservice "multienv/agent/doctor/service"
+	doctorservice "multienv/agent/domains/doctor/service"
 	"multienv/common/log"
 	"multienv/tui/internal/app"
 	"multienv/tui/internal/backend"

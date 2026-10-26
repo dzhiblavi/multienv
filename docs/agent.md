@@ -23,21 +23,21 @@ multienv-agent [--config PATH] tmux COMMAND
 multienv-agent [--config PATH] codex COMMAND
 multienv-agent [--config PATH] master COMMAND
 multienv-agent [--config PATH] filesystem COMMAND
-multienv-agent [--config PATH] invoke
+multienv-agent [--config PATH] host invoke
 multienv-agent help tmux
 ```
 
-In `invoke` and the `tmux`, `codex`, `master` and `filesystem` command trees, parameters are read as one JSON
+In the `host`, `tmux`, `codex`, `master` and `filesystem` command trees, parameters are read as one JSON
 object from stdin. Commands that return a result write JSON to stdout; logs and errors go to stderr. Successful
 commands without a result produce no stdout output.
 
-## Invoke
+## Host commands
 
 Run a command on a list of hosts; `@master` selects the server host and `@all`
 selects the shared host list from [server configuration](server.md#configuration):
 
 ```sh
-printf '%s\n' '{"hostnames":["@master","devbox"],"command":"hostname"}' | multienv-agent invoke
+printf '%s\n' '{"hostnames":["@master","devbox"],"command":"hostname"}' | multienv-agent host invoke
 ```
 
 The request accepts `command`, an optional `args` array, optional `stdin` text and an optional

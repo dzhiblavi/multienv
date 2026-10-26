@@ -6,8 +6,8 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
-	filesystemservice "multienv/agent/filesystem/service"
-	tmuxservice "multienv/agent/tmux/service"
+	filesystemservice "multienv/agent/domains/filesystem/service"
+	tmuxservice "multienv/agent/domains/tmux/service"
 	"multienv/tui/internal/browser"
 	"multienv/tui/internal/dialog"
 	"multienv/tui/internal/display"

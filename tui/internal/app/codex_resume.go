@@ -7,10 +7,10 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
-	codexmodel "multienv/agent/codex/model"
-	codexservice "multienv/agent/codex/service"
-	tmuxmodel "multienv/agent/tmux/model"
-	tmuxservice "multienv/agent/tmux/service"
+	codexmodel "multienv/agent/domains/codex/model"
+	codexservice "multienv/agent/domains/codex/service"
+	tmuxmodel "multienv/agent/domains/tmux/model"
+	tmuxservice "multienv/agent/domains/tmux/service"
 	"multienv/common/log"
 	"multienv/tui/internal/browser"
 	"multienv/tui/internal/dialog"

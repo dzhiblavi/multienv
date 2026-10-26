@@ -9,7 +9,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
-	tmuxservice "multienv/agent/tmux/service"
+	tmuxservice "multienv/agent/domains/tmux/service"
 	"multienv/tui/internal/browser"
 	"multienv/tui/internal/dialog"
 	"multienv/tui/internal/display"

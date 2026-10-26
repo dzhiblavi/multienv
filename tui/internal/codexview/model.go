@@ -12,7 +12,7 @@ import (
 
 	"charm.land/bubbles/v2/viewport"
 
-	"multienv/agent/codex/model"
+	"multienv/agent/domains/codex/model"
 	"multienv/tui/internal/browser"
 	"multienv/tui/internal/config"
 	"multienv/tui/internal/display"

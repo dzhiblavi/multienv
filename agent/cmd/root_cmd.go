@@ -3,12 +3,12 @@ package main
 import (
 	"github.com/spf13/cobra"
 
-	"multienv/agent/cmd/codex"
-	"multienv/agent/cmd/doctor"
-	"multienv/agent/cmd/filesystem"
-	"multienv/agent/cmd/invoke"
-	"multienv/agent/cmd/master"
-	"multienv/agent/cmd/tmux"
+	codexcmd "multienv/agent/domains/codex/cmd"
+	doctorcmd "multienv/agent/domains/doctor/cmd"
+	filesystemcmd "multienv/agent/domains/filesystem/cmd"
+	hostcmd "multienv/agent/domains/host/cmd"
+	mastercmd "multienv/agent/domains/master/cmd"
+	tmuxcmd "multienv/agent/domains/tmux/cmd"
 )
 
 func newRootCmd() *cobra.Command {
@@ -28,11 +28,11 @@ func newRootCmd() *cobra.Command {
 		"path to configuration file",
 	)
 
-	cmd.AddCommand(tmux.NewCommand(&configPath))
-	cmd.AddCommand(codex.NewCommand(&configPath))
-	cmd.AddCommand(master.NewCommand(&configPath))
-	cmd.AddCommand(doctor.NewCommand(&configPath))
-	cmd.AddCommand(filesystem.NewCommand(&configPath))
-	cmd.AddCommand(invoke.NewCommand(&configPath))
+	cmd.AddCommand(tmuxcmd.NewCommand(&configPath))
+	cmd.AddCommand(codexcmd.NewCommand(&configPath))
+	cmd.AddCommand(mastercmd.NewCommand(&configPath))
+	cmd.AddCommand(doctorcmd.NewCommand(&configPath))
+	cmd.AddCommand(filesystemcmd.NewCommand(&configPath))
+	cmd.AddCommand(hostcmd.NewCommand(&configPath))
 	return cmd
 }

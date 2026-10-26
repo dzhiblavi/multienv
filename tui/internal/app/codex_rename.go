@@ -5,7 +5,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
-	codexservice "multienv/agent/codex/service"
+	codexservice "multienv/agent/domains/codex/service"
 	"multienv/tui/internal/dialog"
 )
 
