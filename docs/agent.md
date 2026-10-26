@@ -11,7 +11,7 @@ client:
 
 `client.url` must reach the server, including through an [SSH tunnel](forwarder.md) on remote hosts.
 The defaults are `http://127.0.0.1:12123` and a `2s` timeout.
-The server invokes `~/.bin/multienv-agent` on remote hosts. Make tmux and optional Codex tools
+The server invokes `multienv-agent` from PATH on remote hosts. Make tmux and optional Codex tools
 available in noninteractive SSH sessions; set `CODEX_HOME` there too if needed.
 
 ## CLI
@@ -23,12 +23,30 @@ multienv-agent [--config PATH] tmux COMMAND
 multienv-agent [--config PATH] codex COMMAND
 multienv-agent [--config PATH] master COMMAND
 multienv-agent [--config PATH] filesystem COMMAND
+multienv-agent [--config PATH] invoke
 multienv-agent help tmux
 ```
 
-In the `tmux`, `codex`, `master` and `filesystem` command trees, parameters are read as one JSON
+In `invoke` and the `tmux`, `codex`, `master` and `filesystem` command trees, parameters are read as one JSON
 object from stdin. Commands that return a result write JSON to stdout; logs and errors go to stderr. Successful
 commands without a result produce no stdout output.
+
+## Invoke
+
+Run a command on a list of hosts; `@master` selects the server host:
+
+```sh
+printf '%s\n' '{"hostnames":["@master","devbox"],"command":"hostname"}' | multienv-agent invoke
+```
+
+The request accepts `command`, an optional `args` array, optional `stdin` text and an optional
+per-host `timeout` such as `10s` (default `30s`). Commands run directly; invoke a shell explicitly
+when needed. The agent's `client.timeout` still limits the entire HTTP request.
+
+The JSON response contains `results`, one per host in request order, with `hostname`, `stdout`,
+`stderr`, `exit_code` and an optional `error` for execution failures. Hosts run in parallel;
+one host's failure does not discard other results. The CLI prints the response and returns
+a nonzero exit status if any host fails.
 
 ## Diagnostics
 

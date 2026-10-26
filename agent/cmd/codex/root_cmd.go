@@ -5,10 +5,10 @@ import (
 
 	"github.com/spf13/cobra"
 
-	agenthttp "multienv/agent/client/agent/http"
 	"multienv/agent/codex/client/http"
 	"multienv/agent/codex/service"
 	"multienv/agent/config"
+	hosthttp "multienv/agent/host/client/http"
 	"multienv/common/util"
 )
 
@@ -28,7 +28,7 @@ func NewCommand(configPath *string) *cobra.Command {
 			}
 
 			client := http.New(cfg.Client)
-			instance, err := service.New(client, agenthttp.New(cfg.Client))
+			instance, err := service.New(client, hosthttp.New(cfg.Client))
 			if err != nil {
 				return err
 			}

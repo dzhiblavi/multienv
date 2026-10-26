@@ -6,7 +6,6 @@ import (
 
 	agentclient "multienv/agent/client/agent"
 	"multienv/agent/internal/tmux/local"
-	agentoperations "multienv/common/agent/operations"
 	"multienv/common/tmux/operations"
 )
 
@@ -19,13 +18,9 @@ func (a Agent) PanePreview(
 	}
 
 	if req.Hostname != a.hostname {
-		response, err := agentclient.Forward[operations.PanePreviewResponse](
-			ctx, a.agentClient, agentoperations.ForwardRequest{
-				Hostname: req.Hostname,
-				Domain:   "tmux",
-				Command:  "pane-preview",
-				Input:    req,
-			})
+		response, err := agentclient.InvokeDecode[operations.PanePreviewResponse](
+			ctx, a.hostClient, req.Hostname, "tmux", "pane-preview", req,
+		)
 		if err != nil {
 			return nil, err
 		}

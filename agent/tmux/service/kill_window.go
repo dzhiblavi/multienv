@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 
+	agentclient "multienv/agent/client/agent"
 	"multienv/agent/internal/tmux/local"
-	agentoperations "multienv/common/agent/operations"
 )
 
 type KillWindowParams struct {
@@ -27,11 +27,6 @@ func (a Agent) KillWindow(ctx context.Context, params KillWindowParams) error {
 		return a.SyncLocal(ctx)
 	}
 
-	_, err := a.agentClient.Forward(ctx, agentoperations.ForwardRequest{
-		Hostname: params.Hostname,
-		Domain:   "tmux",
-		Command:  "kill-window",
-		Input:    params,
-	})
+	_, err := agentclient.Invoke(ctx, a.hostClient, params.Hostname, "tmux", "kill-window", params)
 	return err
 }

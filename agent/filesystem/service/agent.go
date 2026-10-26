@@ -4,19 +4,19 @@ import (
 	"fmt"
 	"os"
 
-	agentclient "multienv/agent/client/agent"
+	hostclient "multienv/agent/host/client"
 )
 
 type Agent struct {
-	agentClient agentclient.Client
-	hostname    string
+	hostClient hostclient.Client
+	hostname   string
 }
 
-func New(agentClient agentclient.Client) (*Agent, error) {
+func New(hostClient hostclient.Client) (*Agent, error) {
 	hostname, err := os.Hostname()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get hostname: %w", err)
 	}
 
-	return &Agent{agentClient: agentClient, hostname: hostname}, nil
+	return &Agent{hostClient: hostClient, hostname: hostname}, nil
 }

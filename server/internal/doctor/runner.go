@@ -14,7 +14,7 @@ type AgentRunner struct{}
 
 func (AgentRunner) Diagnose(ctx context.Context, hostname string) (model.Report, error) {
 	command := subprocess.Command{
-		Name: "~/.bin/multienv-agent", Args: []string{"doctor", "local", "--format", "json"},
+		Name: "multienv-agent", Args: []string{"doctor", "local", "--format", "json"},
 	}
 
 	localHostname, err := os.Hostname()

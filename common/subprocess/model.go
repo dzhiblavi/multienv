@@ -1,9 +1,9 @@
 package subprocess
 
 type Command struct {
-	Name  string
-	Stdin string
-	Args  []string
+	Name  string   `json:"command"`
+	Stdin string   `json:"stdin,omitempty"`
+	Args  []string `json:"args,omitempty"`
 }
 
 type RemoteCommand struct {
@@ -12,7 +12,7 @@ type RemoteCommand struct {
 }
 
 type RunResult struct {
-	Stdout   string
-	Stderr   string
-	ExitCode int
+	Stdout   string `json:"stdout"`
+	Stderr   string `json:"stderr"`
+	ExitCode int    `json:"exit_code"`
 }

@@ -6,7 +6,6 @@ import (
 
 	agentclient "multienv/agent/client/agent"
 	"multienv/agent/internal/filesystem/local"
-	agentoperations "multienv/common/agent/operations"
 	"multienv/common/filesystem/operations"
 )
 
@@ -19,13 +18,9 @@ func (a Agent) DirectoryCandidates(
 	}
 
 	if req.Hostname != a.hostname {
-		response, err := agentclient.Forward[operations.DirectoryCandidatesResponse](
-			ctx, a.agentClient, agentoperations.ForwardRequest{
-				Hostname: req.Hostname,
-				Domain:   "filesystem",
-				Command:  "directory-candidates",
-				Input:    req,
-			})
+		response, err := agentclient.InvokeDecode[operations.DirectoryCandidatesResponse](
+			ctx, a.hostClient, req.Hostname, "filesystem", "directory-candidates", req,
+		)
 		if err != nil {
 			return nil, err
 		}

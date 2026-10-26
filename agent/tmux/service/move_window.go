@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 
+	agentclient "multienv/agent/client/agent"
 	"multienv/agent/internal/tmux/local"
-	agentoperations "multienv/common/agent/operations"
 )
 
 type MoveWindowParams struct {
@@ -28,11 +28,6 @@ func (a Agent) MoveWindow(ctx context.Context, params MoveWindowParams) error {
 		return local.MoveWindow(ctx, params.SessionId, params.WindowId, *params.NewIndex)
 	}
 
-	_, err := a.agentClient.Forward(ctx, agentoperations.ForwardRequest{
-		Hostname: params.Hostname,
-		Domain:   "tmux",
-		Command:  "move-window",
-		Input:    params,
-	})
+	_, err := agentclient.Invoke(ctx, a.hostClient, params.Hostname, "tmux", "move-window", params)
 	return err
 }

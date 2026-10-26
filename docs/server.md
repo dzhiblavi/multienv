@@ -29,7 +29,8 @@ storage:
 ```
 
 Use actual hostnames in the host lists; the server also uses these names for SSH.
-It invokes `~/.bin/multienv-agent` on remote hosts.
+It invokes `multienv-agent` from PATH on remote hosts.
+Generic command execution uses `POST /host` with action `invoke`; see [agent invoke](agent.md#invoke).
 `tmux.hosts` and `codex.hosts` select the machines collected for each domain.
 Set `codex.hosts` to an empty list to disable Codex collection; add its hosts to enable it.
 If omitted, both host lists default to the server's own hostname.

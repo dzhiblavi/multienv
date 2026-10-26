@@ -6,7 +6,6 @@ import (
 
 	agentclient "multienv/agent/client/agent"
 	"multienv/agent/internal/tmux/local"
-	agentoperations "multienv/common/agent/operations"
 	"multienv/common/tmux/model"
 	"multienv/common/tmux/operations"
 )
@@ -41,12 +40,9 @@ func (a Agent) newLocalSession(ctx context.Context, name string) (*model.Session
 }
 
 func (a Agent) newRemoteSession(ctx context.Context, params NewSessionParams) (*model.Session, error) {
-	session, err := agentclient.Forward[model.Session](ctx, a.agentClient, agentoperations.ForwardRequest{
-		Hostname: params.Hostname,
-		Domain:   "tmux",
-		Command:  "new-session",
-		Input:    params,
-	})
+	session, err := agentclient.InvokeDecode[model.Session](
+		ctx, a.hostClient, params.Hostname, "tmux", "new-session", params,
+	)
 	if err != nil {
 		return nil, err
 	}

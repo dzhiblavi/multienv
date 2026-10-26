@@ -5,9 +5,9 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"multienv/agent/client/agent/http"
 	"multienv/agent/config"
 	"multienv/agent/filesystem/service"
+	"multienv/agent/host/client/http"
 	"multienv/common/util"
 )
 

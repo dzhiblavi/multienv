@@ -6,7 +6,6 @@ import (
 
 	agentclient "multienv/agent/client/agent"
 	"multienv/agent/internal/tmux/local"
-	agentoperations "multienv/common/agent/operations"
 )
 
 type NewWindowParams struct {
@@ -36,12 +35,9 @@ func (a Agent) NewWindow(ctx context.Context, params NewWindowParams) (*NewWindo
 		return &NewWindowResult{TmuxPaneId: paneId}, nil
 	}
 
-	result, err := agentclient.Forward[NewWindowResult](ctx, a.agentClient, agentoperations.ForwardRequest{
-		Hostname: params.Hostname,
-		Domain:   "tmux",
-		Command:  "new-window",
-		Input:    params,
-	})
+	result, err := agentclient.InvokeDecode[NewWindowResult](
+		ctx, a.hostClient, params.Hostname, "tmux", "new-window", params,
+	)
 	if err != nil {
 		return nil, err
 	}

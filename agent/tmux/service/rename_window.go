@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 
+	agentclient "multienv/agent/client/agent"
 	"multienv/agent/internal/tmux/local"
-	agentoperations "multienv/common/agent/operations"
 )
 
 type RenameWindowParams struct {
@@ -24,11 +24,6 @@ func (a Agent) RenameWindow(ctx context.Context, params RenameWindowParams) erro
 		return local.RenameWindow(ctx, params.SessionId, params.WindowId, params.NewName)
 	}
 
-	_, err := a.agentClient.Forward(ctx, agentoperations.ForwardRequest{
-		Hostname: params.Hostname,
-		Domain:   "tmux",
-		Command:  "rename-window",
-		Input:    params,
-	})
+	_, err := agentclient.Invoke(ctx, a.hostClient, params.Hostname, "tmux", "rename-window", params)
 	return err
 }

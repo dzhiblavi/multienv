@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 
+	agentclient "multienv/agent/client/agent"
 	"multienv/agent/internal/codex/local"
-	agentoperations "multienv/common/agent/operations"
 	"multienv/common/codex/operations"
 )
 
@@ -43,16 +43,9 @@ func (a Agent) unarchiveLocalSession(ctx context.Context, id string) error {
 }
 
 func (a Agent) unarchiveRemoteSession(ctx context.Context, params UnarchiveSessionParams) error {
-	op := agentoperations.ForwardRequest{
-		Hostname: params.Hostname,
-		Domain:   "codex",
-		Command:  "unarchive-session",
-		Input:    params,
-	}
-
-	_, err := a.agentClient.Forward(ctx, op)
+	_, err := agentclient.Invoke(ctx, a.hostClient, params.Hostname, "codex", "unarchive-session", params)
 	if err != nil {
-		return fmt.Errorf("forward agent call failed: %v", err)
+		return fmt.Errorf("invoke agent failed: %v", err)
 	}
 
 	return nil

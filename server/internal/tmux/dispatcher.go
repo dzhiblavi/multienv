@@ -7,19 +7,19 @@ import (
 
 	"multienv/common/log"
 	"multienv/common/tmux/operations"
-	"multienv/server/internal/agent"
 	"multienv/server/internal/dispatcher"
+	"multienv/server/internal/host"
 	"multienv/server/internal/storage"
 )
 
 type Dispatcher struct {
-	config    Config
-	storage   storage.Storage
-	forwarder agent.Forwarder
+	config  Config
+	storage storage.Storage
+	invoker host.Invoker
 }
 
-func New(config Config, storage storage.Storage, forwarder agent.Forwarder) Dispatcher {
-	return Dispatcher{config: config, storage: storage, forwarder: forwarder}
+func New(config Config, storage storage.Storage, invoker host.Invoker) Dispatcher {
+	return Dispatcher{config: config, storage: storage, invoker: invoker}
 }
 
 func (s Dispatcher) Dispatch(ctx context.Context, payload string) (any, error) {

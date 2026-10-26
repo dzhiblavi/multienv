@@ -2,10 +2,10 @@ package tmux
 
 import (
 	"context"
-	"sync"
 
-	agentoperations "multienv/common/agent/operations"
+	hostoperations "multienv/common/host/operations"
 	"multienv/common/log"
+	"multienv/common/subprocess"
 	"multienv/common/tmux/operations"
 )
 
@@ -13,31 +13,23 @@ func (s Dispatcher) SyncAllSessions(
 	ctx context.Context,
 	req operations.SyncAllSessionsRequest,
 ) (*operations.SyncAllSessionsResponse, error) {
-	var wg sync.WaitGroup
-
-	for _, host := range s.config.Hosts {
-		wg.Add(1)
-
-		go func(host string) {
-			ctx := log.WithCustomLogData(ctx, "host", host)
-			log.Info(ctx, "syncing host")
-
-			req := agentoperations.ForwardRequest{
-				Hostname: host,
-				Domain:   "tmux",
-				Command:  "sync-local",
-			}
-
-			_, err := s.forwarder.Forward(ctx, req)
-			if err != nil {
-				log.Error(ctx, "failed to sync host", "error", err)
-			}
-
-			wg.Done()
-		}(host)
+	if len(s.config.Hosts) == 0 {
+		return &operations.SyncAllSessionsResponse{}, nil
 	}
 
-	wg.Wait()
+	response, err := s.invoker.Invoke(ctx, hostoperations.InvokeRequest{
+		Hostnames: s.config.Hosts,
+		Command:   subprocess.Command{Name: "multienv-agent", Args: []string{"tmux", "sync-local"}},
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	for _, result := range response.Results {
+		if err := result.Err(); err != nil {
+			log.Error(ctx, "failed to sync host", "host", result.Hostname, "error", err)
+		}
+	}
 
 	return &operations.SyncAllSessionsResponse{}, nil
 }

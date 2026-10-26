@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 
+	agentclient "multienv/agent/client/agent"
 	"multienv/agent/internal/tmux/local"
-	agentoperations "multienv/common/agent/operations"
 	"multienv/common/tmux/operations"
 )
 
@@ -49,16 +49,9 @@ func (a Agent) renameLocalSession(ctx context.Context, id, newName string) error
 }
 
 func (a Agent) renameRemoteSession(ctx context.Context, params RenameSessionParams) error {
-	op := agentoperations.ForwardRequest{
-		Hostname: params.Hostname,
-		Domain:   "tmux",
-		Command:  "rename-session",
-		Input:    params,
-	}
-
-	_, err := a.agentClient.Forward(ctx, op)
+	_, err := agentclient.Invoke(ctx, a.hostClient, params.Hostname, "tmux", "rename-session", params)
 	if err != nil {
-		return fmt.Errorf("forward agent call failed: %v", err)
+		return fmt.Errorf("invoke agent failed: %v", err)
 	}
 
 	return nil

@@ -4,9 +4,9 @@ import (
 	"context"
 	"fmt"
 
+	agentclient "multienv/agent/client/agent"
 	"multienv/agent/internal/codex/local"
 	tmux "multienv/agent/internal/tmux/local"
-	agentoperations "multienv/common/agent/operations"
 	"multienv/common/codex/operations"
 	"multienv/common/log"
 )
@@ -53,16 +53,9 @@ func (a Agent) deleteLocalSession(ctx context.Context, id string) error {
 }
 
 func (a Agent) deleteRemoteSession(ctx context.Context, params DeleteSessionParams) error {
-	op := agentoperations.ForwardRequest{
-		Hostname: params.Hostname,
-		Domain:   "codex",
-		Command:  "delete-session",
-		Input:    params,
-	}
-
-	_, err := a.agentClient.Forward(ctx, op)
+	_, err := agentclient.Invoke(ctx, a.hostClient, params.Hostname, "codex", "delete-session", params)
 	if err != nil {
-		return fmt.Errorf("forward agent call failed: %v", err)
+		return fmt.Errorf("invoke agent failed: %v", err)
 	}
 
 	return nil

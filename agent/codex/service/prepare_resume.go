@@ -7,7 +7,6 @@ import (
 
 	agentclient "multienv/agent/client/agent"
 	"multienv/agent/internal/codex/local"
-	agentoperations "multienv/common/agent/operations"
 	"multienv/common/codex/model"
 	"multienv/common/codex/operations"
 )
@@ -77,10 +76,5 @@ func (a Agent) prepareRemoteResume(
 	ctx context.Context,
 	params PrepareResumeParams,
 ) (model.Session, error) {
-	return agentclient.Forward[model.Session](ctx, a.agentClient, agentoperations.ForwardRequest{
-		Hostname: params.Hostname,
-		Domain:   "codex",
-		Command:  "prepare-resume",
-		Input:    params,
-	})
+	return agentclient.InvokeDecode[model.Session](ctx, a.hostClient, params.Hostname, "codex", "prepare-resume", params)
 }

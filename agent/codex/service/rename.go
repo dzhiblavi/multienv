@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"strings"
 
+	agentclient "multienv/agent/client/agent"
 	"multienv/agent/internal/codex/local"
-	agentoperations "multienv/common/agent/operations"
 	"multienv/common/codex/operations"
 )
 
@@ -25,12 +25,7 @@ func (a Agent) RenameSession(ctx context.Context, params RenameSessionParams) er
 		return a.renameLocalSession(ctx, params.SessionId, params.NewName)
 	}
 
-	_, err := a.agentClient.Forward(ctx, agentoperations.ForwardRequest{
-		Hostname: params.Hostname,
-		Domain:   "codex",
-		Command:  "rename-session",
-		Input:    params,
-	})
+	_, err := agentclient.Invoke(ctx, a.hostClient, params.Hostname, "codex", "rename-session", params)
 	return err
 }
 

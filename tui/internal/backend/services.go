@@ -7,26 +7,26 @@ import (
 	"slices"
 
 	agentclient "multienv/agent/client/agent"
-	agenthttp "multienv/agent/client/agent/http"
 	codexhttp "multienv/agent/codex/client/http"
 	codexservice "multienv/agent/codex/service"
 	agentconfig "multienv/agent/config"
 	doctorservice "multienv/agent/doctor/service"
 	filesystemservice "multienv/agent/filesystem/service"
+	hostclient "multienv/agent/host/client"
+	hosthttp "multienv/agent/host/client/http"
 	tmuxhttp "multienv/agent/tmux/client/http"
 	tmuxservice "multienv/agent/tmux/service"
-	agentops "multienv/common/agent/operations"
 	doctormodel "multienv/common/doctor/model"
 	"multienv/common/util"
 	"multienv/tui/internal/config"
 )
 
 type Services struct {
-	AgentClient agentclient.Client
-	Diagnose    func(context.Context) doctormodel.Report
-	Tmux        *tmuxservice.Agent
-	Codex       *codexservice.Agent
-	Filesystem  *filesystemservice.Agent
+	HostClient hostclient.Client
+	Diagnose   func(context.Context) doctormodel.Report
+	Tmux       *tmuxservice.Agent
+	Codex      *codexservice.Agent
+	Filesystem *filesystemservice.Agent
 }
 
 func New(ctx context.Context) (Services, error) {
@@ -35,23 +35,23 @@ func New(ctx context.Context) (Services, error) {
 		return Services{}, err
 	}
 
-	forwarding := agenthttp.New(cfg.Client)
-	tmux, err := tmuxservice.New(tmuxhttp.New(cfg.Client), forwarding)
+	hosts := hosthttp.New(cfg.Client)
+	tmux, err := tmuxservice.New(tmuxhttp.New(cfg.Client), hosts)
 	if err != nil {
 		return Services{}, err
 	}
 
-	codex, err := codexservice.New(codexhttp.New(cfg.Client), forwarding)
+	codex, err := codexservice.New(codexhttp.New(cfg.Client), hosts)
 	if err != nil {
 		return Services{}, err
 	}
 
-	filesystem, err := filesystemservice.New(forwarding)
+	filesystem, err := filesystemservice.New(hosts)
 	if err != nil {
 		return Services{}, err
 	}
 
-	return Services{AgentClient: forwarding, Tmux: tmux, Codex: codex, Filesystem: filesystem,
+	return Services{HostClient: hosts, Tmux: tmux, Codex: codex, Filesystem: filesystem,
 		Diagnose: func(ctx context.Context) doctormodel.Report {
 			return doctorservice.Global(ctx, config.AgentPath)
 		},
@@ -75,9 +75,7 @@ func (s Services) Refresh(ctx context.Context, domain string, hosts []string) er
 				err = s.Codex.SyncLocal(ctx)
 			}
 		} else {
-			_, err = s.AgentClient.Forward(ctx, agentops.ForwardRequest{
-				Hostname: host, Domain: domain, Command: "sync-local",
-			})
+			_, err = agentclient.Invoke(ctx, s.HostClient, host, domain, "sync-local", nil)
 		}
 
 		failures = append(failures, err)

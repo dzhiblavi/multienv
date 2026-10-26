@@ -18,7 +18,7 @@ Here `devbox` matches the remote machine's actual hostname, while `dev` is a fri
 Check the connection and agent installation:
 
 ```sh
-ssh -T -o BatchMode=yes devbox '~/.bin/multienv-agent tmux list-local'
+ssh -T -o BatchMode=yes devbox 'multienv-agent tmux list-local'
 ```
 
 The remote SSH server must allow TCP forwarding.

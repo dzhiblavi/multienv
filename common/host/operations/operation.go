@@ -1,8 +1,6 @@
 package operations
 
-import (
-	"encoding/json"
-)
+import "encoding/json"
 
 type Operation struct {
 	Action  string          `json:"action"`
