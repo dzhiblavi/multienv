@@ -27,7 +27,8 @@ storage:
 Use actual hostnames in `hosts`; the server also uses these names for SSH.
 `@master` can represent the server host in this list. If omitted, `hosts` defaults to the server's own hostname.
 The `@all` invocation alias selects these hosts; duplicate targets are executed once.
-It invokes `multienv-agent` from PATH on remote hosts.
+The caller supplies the command, arguments and stdin. The server runs the command locally or over SSH
+without interpreting integration-specific operations or data.
 Generic command execution uses `POST /host` with action `invoke`; see [agent host commands](agent.md#host-commands).
 JSON storage uses `POST /storage`; see [storage operations](storage.md).
 
@@ -47,4 +48,6 @@ Choose one invocation. Logs go to stdout. Stop with Ctrl-C, or manage the server
 Redis must be reachable when the server starts.
 
 For diagnostics, run `multienv-agent doctor global` from a configured host.
+The server checks Redis and runs `multienv-agent doctor local --format json` on itself and configured hosts.
+This diagnostic command requires `multienv-agent` in PATH.
 See [agent diagnostics](agent.md#diagnostics).

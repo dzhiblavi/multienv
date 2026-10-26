@@ -11,8 +11,9 @@ client:
 
 `client.url` must reach the server, including through an [SSH tunnel](forwarder.md) on remote hosts.
 The defaults are `http://127.0.0.1:12123` and a `2s` timeout.
-The server invokes `multienv-agent` from PATH on remote hosts. Make tmux and optional Codex tools
-available in noninteractive SSH sessions; set `CODEX_HOME` there too if needed.
+For remote integration operations, the agent asks the server to invoke `multienv-agent` from PATH.
+Make it, tmux and optional Codex tools available in noninteractive SSH sessions;
+set `CODEX_HOME` there too if needed.
 
 ## CLI
 
@@ -24,12 +25,14 @@ multienv-agent [--config PATH] codex COMMAND
 multienv-agent [--config PATH] master COMMAND
 multienv-agent [--config PATH] filesystem COMMAND
 multienv-agent [--config PATH] host invoke
+multienv-agent [--config PATH] doctor [local|global]
 multienv-agent help tmux
 ```
 
-In the `host`, `tmux`, `codex`, `master` and `filesystem` command trees, parameters are read as one JSON
-object from stdin. Commands that return a result write JSON to stdout; logs and errors go to stderr. Successful
-commands without a result produce no stdout output.
+Commands in the `host`, `tmux`, `codex`, `master` and `filesystem` trees that take parameters read one JSON
+object from stdin. Session queries and synchronization commands need no input.
+Commands that return a result write JSON to stdout; logs and errors go to stderr.
+Successful commands without a result produce no stdout output.
 
 ## Host commands
 
@@ -118,6 +121,7 @@ printf '%s\n' '{"hostname":"devbox","session_id":"YOUR_CODEX_SESSION_ID"}' \
 ```
 
 `prepare-resume` prepares the session; the caller starts the Codex process.
+Renaming updates local Codex data; an already open Codex TUI shows the new name after reopening.
 
 ## Filesystem operations
 

@@ -121,7 +121,8 @@ directories from zoxide when it is installed on that host. Esc cancels creation.
 
 ## Optional Codex integration
 
-Codex uses the shared host list from [server configuration](server.md#configuration).
+Synchronization uses the shared host list from [server configuration](server.md#configuration).
+The conversation list combines stored snapshots with a fresh local snapshot.
 
 Install the [Codex dependencies](requirements.md#optional-tools) on those hosts. The integration uses the same
 agent, SSH connections and tmux sessions as the main workspace. Press Ctrl-B in the

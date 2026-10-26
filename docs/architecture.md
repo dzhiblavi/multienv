@@ -2,9 +2,9 @@
 
 ```mermaid
 flowchart LR
-    TUI["TUI on any host"] -->|HTTP over SSH tunnels| Server["Server on master"]
-    Server -->|Commands| Agents["Agents on managed hosts"]
-    Agents -->|"State snapshots"| Server
+    TUI["TUI on any host"] -->|Session operations| Agent["Agent services"]
+    Agent -->|HTTP over SSH tunnels| Server["Server on master"]
+    Server -->|Local execution or SSH| Commands["Commands on selected hosts"]
     Server --> Redis["JSON documents in Redis"]
     TUI -->|Switch request| Launcher["Workstation launcher"]
     Launcher -->|Local attach or SSH| Sessions["tmux sessions"]
@@ -12,12 +12,16 @@ flowchart LR
 
 The **server** provides shared JSON storage in Redis and dispatches commands
 to the appropriate host. It runs commands directly on its own host and uses SSH
-to invoke the agent elsewhere. Desktop actions run on the server's machine.
+elsewhere. Callers supply the command, arguments and stdin; the server does not interpret
+tmux, Codex or filesystem operations, or the documents stored by integrations.
+Desktop actions run on the server's machine. Diagnostics check Redis and collect
+local doctor reports from agents on the server and configured hosts.
 
-The **agent** reads local tmux state, publishes snapshots and performs requested
-actions. It provides a tmux command tree, additional Codex integration
-commands, and master desktop commands. Agents communicate with the server using
-HTTP and JSON.
+The **agent** owns integrations: it reads local state, publishes snapshots through
+generic storage and performs requested actions. For remote operations, it asks the server
+to invoke `multienv-agent` with the appropriate command and JSON input.
+It also exposes generic host invocation and master desktop commands.
+External integrations can use host invocation without changes to the server.
 
 The **TUI** displays sessions across hosts, requests synchronization and refreshes its view. Each snapshot
 records when it was taken, so unavailable hosts remain recognizable by their stale data.

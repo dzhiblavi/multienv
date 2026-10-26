@@ -30,8 +30,9 @@ Agents run on demand; they are not background services. Open the TUI only when n
 | Forwarder host | Bash 4+, SSH client, jq |
 | Remote hosts | SSH server allowing noninteractive login and TCP forwarding |
 
-The server invokes `multienv-agent` from PATH over SSH. Its noninteractive environment must include tmux
-and any tools used by enabled integrations.
+Built-in integrations request remote execution of `multienv-agent` through the server.
+The noninteractive SSH environment must include it in PATH, along with tmux and any tools used by
+enabled integrations. Global diagnostics also require the agent in PATH on the server host.
 
 ## Redis
 

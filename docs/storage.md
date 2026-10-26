@@ -21,8 +21,8 @@ in path segments are object keys, not JSONPath expressions or array indices.
 | --- | --- | --- |
 | `get` | `key`, optional `path` | `{"found": true, "value": ...}` |
 | `set` | `key`, optional `path`, `value` | `{}` |
-| `set-if-absent` | `key`, optional `path`, `value` | `{"created": true}` when inserted, otherwise `false` |
-| `delete` | `key`, optional `path` | `{"deleted": true}` when removed, otherwise `false` |
+| `set-if-absent` | `key`, optional `path`, `value` | `{"created": true}` or `{"created": false}` |
+| `delete` | `key`, optional `path` | `{"deleted": true}` or `{"deleted": false}` |
 
 A missing value returns `{"found": false, "value": null}`. Stored JSON `null` returns
 `{"found": true, "value": null}` and counts as existing for `set-if-absent`.
