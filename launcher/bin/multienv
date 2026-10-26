@@ -60,7 +60,7 @@ listen() {
         [[ -n "${hostname}" && -n "${target}" ]] || continue
 
         log "received ${hostname}, ${target}"
-        attach "${hostname}" "${target}" </dev/tty &
+        attach "${hostname}" "${target}" <&"${terminal_input_fd}" &
     done < <(nc -kl 127.0.0.1 "${control_port}")
 }
 
@@ -75,6 +75,8 @@ trap cleanup SIGINT SIGTERM EXIT
 
 initial_session="${1:?need initial session}"
 initial_host="${2:-$(hostname)}"
-attach "${initial_host}" "${initial_session}" </dev/tty &
+
+exec {terminal_input_fd}<&0
+attach "${initial_host}" "${initial_session}" <&"${terminal_input_fd}" &
 
 listen
