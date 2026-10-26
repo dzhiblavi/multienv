@@ -4,20 +4,23 @@ import (
 	"context"
 	"fmt"
 
+	"multienv/agent/codex/model"
 	"multienv/agent/internal/codex/local"
-	"multienv/common/codex/model"
-	"multienv/common/codex/operations"
+	storageclient "multienv/agent/storage/client"
 	"multienv/common/log"
+	storagemodel "multienv/common/storage/model"
 )
 
 func (a Agent) ListAll(ctx context.Context) (model.SessionsByHost, error) {
 	sessions := make(model.SessionsByHost)
 
-	response, err := a.client.ListAll(ctx, operations.ListAllRequest{})
+	snapshot, _, err := storageclient.GetDecode[model.SessionsByHost](
+		ctx, a.storage, storagemodel.Location{Key: sessionsKey},
+	)
 	if err != nil {
 		log.Warn(ctx, "failed to get all sessions; using local sessions", "error", err)
-	} else {
-		sessions = response.Sessions
+	} else if snapshot != nil {
+		sessions = snapshot
 	}
 
 	localSessions, err := local.ListSessions(ctx)

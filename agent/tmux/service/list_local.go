@@ -4,7 +4,7 @@ import (
 	"context"
 
 	"multienv/agent/internal/tmux/local"
-	"multienv/common/tmux/model"
+	"multienv/agent/tmux/model"
 )
 
 func (a Agent) ListLocal(ctx context.Context) (model.SessionsById, error) {

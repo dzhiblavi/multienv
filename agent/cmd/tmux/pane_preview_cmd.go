@@ -6,7 +6,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"multienv/common/tmux/operations"
+	tmuxservice "multienv/agent/tmux/service"
 )
 
 func newPanePreviewCmd(app *App) *cobra.Command {
@@ -15,7 +15,7 @@ func newPanePreviewCmd(app *App) *cobra.Command {
 		Short: "capture the visible contents of a local or remote tmux pane",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			var req operations.PanePreviewRequest
+			var req tmuxservice.PanePreviewParams
 			if err := json.NewDecoder(cmd.InOrStdin()).Decode(&req); err != nil {
 				return fmt.Errorf("failed to decode request: %w", err)
 			}

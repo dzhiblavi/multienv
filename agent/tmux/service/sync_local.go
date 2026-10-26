@@ -5,7 +5,8 @@ import (
 	"fmt"
 
 	"multienv/agent/internal/tmux/local"
-	"multienv/common/tmux/operations"
+	storageclient "multienv/agent/storage/client"
+	storagemodel "multienv/common/storage/model"
 )
 
 func (a Agent) SyncLocal(ctx context.Context) error {
@@ -14,11 +15,6 @@ func (a Agent) SyncLocal(ctx context.Context) error {
 		return fmt.Errorf("failed to get local sessions: %v", err)
 	}
 
-	op := operations.SetSessionsRequest{
-		Hostname: a.hostname,
-		Sessions: localSessions,
-	}
-
-	_, err = a.client.SetSessions(ctx, op)
-	return err
+	at := storagemodel.Location{Key: sessionsKey, Path: []string{a.hostname}}
+	return storageclient.SetEncode(ctx, a.storage, at, localSessions)
 }

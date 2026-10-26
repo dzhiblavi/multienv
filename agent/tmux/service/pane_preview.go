@@ -6,19 +6,27 @@ import (
 
 	agentclient "multienv/agent/client/agent"
 	"multienv/agent/internal/tmux/local"
-	"multienv/common/tmux/operations"
 )
+
+type PanePreviewParams struct {
+	Hostname string `json:"hostname"`
+	Target   string `json:"target"`
+}
+
+type PanePreviewResult struct {
+	Content string `json:"content"`
+}
 
 func (a Agent) PanePreview(
 	ctx context.Context,
-	req operations.PanePreviewRequest,
-) (*operations.PanePreviewResponse, error) {
+	req PanePreviewParams,
+) (*PanePreviewResult, error) {
 	if req.Hostname == "" || req.Target == "" {
 		return nil, fmt.Errorf("hostname and target are required")
 	}
 
 	if req.Hostname != a.hostname {
-		response, err := agentclient.InvokeDecode[operations.PanePreviewResponse](
+		response, err := agentclient.InvokeDecode[PanePreviewResult](
 			ctx, a.hostClient, req.Hostname, "tmux", "pane-preview", req,
 		)
 		if err != nil {
@@ -33,5 +41,5 @@ func (a Agent) PanePreview(
 		return nil, err
 	}
 
-	return &operations.PanePreviewResponse{Content: content}, nil
+	return &PanePreviewResult{Content: content}, nil
 }

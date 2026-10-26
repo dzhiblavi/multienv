@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"multienv/common/codex/model"
+	"multienv/agent/codex/model"
 )
 
 func GetSession(ctx context.Context, id string) (model.Session, error) {

@@ -13,7 +13,7 @@ import (
 	"strings"
 	"time"
 
-	"multienv/common/codex/model"
+	"multienv/agent/codex/model"
 	"multienv/common/log"
 	"multienv/common/subprocess"
 	"multienv/common/util"

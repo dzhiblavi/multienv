@@ -6,8 +6,8 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
+	filesystemservice "multienv/agent/filesystem/service"
 	tmuxservice "multienv/agent/tmux/service"
-	"multienv/common/filesystem/operations"
 	"multienv/tui/internal/browser"
 	"multienv/tui/internal/dialog"
 	"multienv/tui/internal/display"
@@ -39,7 +39,7 @@ func (m *model) windowDirectories() tea.Cmd {
 	m.busy = true
 	return func() tea.Msg {
 		choices := directoryChoices{session: s, current: window.CurrentPath}
-		request := operations.DirectoryCandidatesRequest{Hostname: s.Host}
+		request := filesystemservice.DirectoryCandidatesParams{Hostname: s.Host}
 		response, err := m.services.Filesystem.DirectoryCandidates(m.ctx, request)
 		choices.err = err
 		if err == nil {

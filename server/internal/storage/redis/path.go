@@ -23,6 +23,6 @@ func quoteKey(key string) string {
 }
 
 func quotePathKey(key string) string {
-    escaped := strings.ReplaceAll(key, "\\", "\\\\")
-    return "\"" + strings.ReplaceAll(escaped, "\"", "\\\"") + "\""
+	escaped := strings.ReplaceAll(key, "\\", "\\\\")
+	return "\"" + strings.ReplaceAll(escaped, "\"", "\\\"") + "\""
 }

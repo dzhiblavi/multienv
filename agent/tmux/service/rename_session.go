@@ -6,7 +6,6 @@ import (
 
 	agentclient "multienv/agent/client/agent"
 	"multienv/agent/internal/tmux/local"
-	"multienv/common/tmux/operations"
 )
 
 type RenameSessionParams struct {
@@ -39,12 +38,7 @@ func (a Agent) renameLocalSession(ctx context.Context, id, newName string) error
 		return fmt.Errorf("failed to find renamed session")
 	}
 
-	op := operations.SetSessionRequest{
-		Hostname: a.hostname,
-		Session:  session,
-	}
-
-	_, err = a.client.SetSession(ctx, op)
+	err = a.publishSession(ctx, session)
 	return err
 }
 

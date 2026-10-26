@@ -6,10 +6,10 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
-	codexmodel "multienv/common/codex/model"
+	codexmodel "multienv/agent/codex/model"
+	tmuxmodel "multienv/agent/tmux/model"
 	doctormodel "multienv/common/doctor/model"
 	"multienv/common/log"
-	tmuxmodel "multienv/common/tmux/model"
 	"multienv/tui/internal/doctorview"
 )
 

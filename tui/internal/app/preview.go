@@ -5,7 +5,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
-	"multienv/common/tmux/operations"
+	tmuxservice "multienv/agent/tmux/service"
 )
 
 type previewLoaded struct {
@@ -24,8 +24,8 @@ func (m *model) cancelPreview() {
 	m.tmux.Pane = ""
 }
 
-func (m *model) previewRequest() (string, operations.PanePreviewRequest, bool) {
-	var req operations.PanePreviewRequest
+func (m *model) previewRequest() (string, tmuxservice.PanePreviewParams, bool) {
+	var req tmuxservice.PanePreviewParams
 	if m.mode != Tmux {
 		return "", req, false
 	}

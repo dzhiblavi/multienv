@@ -5,8 +5,8 @@ import (
 	"strings"
 	"time"
 
+	"multienv/agent/tmux/model"
 	"multienv/common/subprocess"
-	"multienv/common/tmux/model"
 )
 
 func NewSession(ctx context.Context, name string) (model.Session, error) {

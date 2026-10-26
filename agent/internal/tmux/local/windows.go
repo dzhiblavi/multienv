@@ -6,8 +6,8 @@ import (
 	"strconv"
 	"strings"
 
+	"multienv/agent/tmux/model"
 	"multienv/common/subprocess"
-	"multienv/common/tmux/model"
 )
 
 // Include the session ID because a window may be linked to multiple sessions.

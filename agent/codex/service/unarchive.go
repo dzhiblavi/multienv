@@ -6,7 +6,6 @@ import (
 
 	agentclient "multienv/agent/client/agent"
 	"multienv/agent/internal/codex/local"
-	"multienv/common/codex/operations"
 )
 
 type UnarchiveSessionParams struct {
@@ -33,12 +32,7 @@ func (a Agent) unarchiveLocalSession(ctx context.Context, id string) error {
 		return fmt.Errorf("failed to get session: %v", err)
 	}
 
-	op := operations.SetSessionRequest{
-		Hostname: a.hostname,
-		Session:  session,
-	}
-
-	_, err = a.client.SetSession(ctx, op)
+	err = a.publishSession(ctx, session)
 	return err
 }
 

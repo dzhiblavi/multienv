@@ -6,9 +6,8 @@ import (
 	"os"
 
 	agentclient "multienv/agent/client/agent"
+	"multienv/agent/codex/model"
 	"multienv/agent/internal/codex/local"
-	"multienv/common/codex/model"
-	"multienv/common/codex/operations"
 )
 
 type PrepareResumeParams struct {
@@ -61,10 +60,7 @@ func (a Agent) prepareLocalResume(ctx context.Context, id string) (model.Session
 		return model.Session{}, fmt.Errorf("session directory is not a directory: %s", session.WorkDir)
 	}
 
-	_, err = a.client.SetSession(ctx, operations.SetSessionRequest{
-		Hostname: a.hostname,
-		Session:  session,
-	})
+	err = a.publishSession(ctx, session)
 	if err != nil {
 		return model.Session{}, fmt.Errorf("publish prepared Codex session: %w", err)
 	}

@@ -7,14 +7,13 @@ import (
 	"slices"
 
 	agentclient "multienv/agent/client/agent"
-	codexhttp "multienv/agent/codex/client/http"
 	codexservice "multienv/agent/codex/service"
 	agentconfig "multienv/agent/config"
 	doctorservice "multienv/agent/doctor/service"
 	filesystemservice "multienv/agent/filesystem/service"
 	hostclient "multienv/agent/host/client"
 	hosthttp "multienv/agent/host/client/http"
-	tmuxhttp "multienv/agent/tmux/client/http"
+	storagehttp "multienv/agent/storage/client/http"
 	tmuxservice "multienv/agent/tmux/service"
 	doctormodel "multienv/common/doctor/model"
 	"multienv/common/util"
@@ -36,12 +35,13 @@ func New(ctx context.Context) (Services, error) {
 	}
 
 	hosts := hosthttp.New(cfg.Client)
-	tmux, err := tmuxservice.New(tmuxhttp.New(cfg.Client), hosts)
+	data := storagehttp.New(cfg.Client)
+	tmux, err := tmuxservice.New(data, hosts)
 	if err != nil {
 		return Services{}, err
 	}
 
-	codex, err := codexservice.New(codexhttp.New(cfg.Client), hosts)
+	codex, err := codexservice.New(data, hosts)
 	if err != nil {
 		return Services{}, err
 	}

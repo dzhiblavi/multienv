@@ -7,7 +7,7 @@ import (
 
 	"multienv/agent/config"
 	hosthttp "multienv/agent/host/client/http"
-	"multienv/agent/tmux/client/http"
+	storagehttp "multienv/agent/storage/client/http"
 	"multienv/agent/tmux/service"
 	"multienv/common/util"
 )
@@ -27,8 +27,7 @@ func NewCommand(configPath *string) *cobra.Command {
 				return fmt.Errorf("failed to parse config: %v", err)
 			}
 
-			client := http.New(cfg.Client)
-			instance, err := service.New(client, hosthttp.New(cfg.Client))
+			instance, err := service.New(storagehttp.New(cfg.Client), hosthttp.New(cfg.Client))
 			if err != nil {
 				return err
 			}

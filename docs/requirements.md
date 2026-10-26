@@ -36,6 +36,7 @@ and any tools used by enabled integrations.
 ## Redis
 
 Redis must support `JSON.GET`, `JSON.SET`, `JSON.DEL`, `JSON.TYPE`, `EVAL` and `EVALSHA`.
+Transactions (`WATCH`, `UNWATCH`, `MULTI`, `EXEC`) are required for paths containing quotes or backslashes.
 The account also needs `PING` and `COMMAND INFO` for connection and capability checks,
 and read/write access to the JSON documents used by integrations.
 The built-in integrations use `@tmux` and `@codex`.

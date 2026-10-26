@@ -10,7 +10,10 @@ func (s *redisStorage) Check(ctx context.Context) error {
 		return err
 	}
 
-	names := []string{"JSON.GET", "JSON.SET", "JSON.DEL", "JSON.TYPE", "EVAL", "EVALSHA"}
+	names := []string{
+		"JSON.GET", "JSON.SET", "JSON.DEL", "JSON.TYPE", "EVAL", "EVALSHA",
+		"WATCH", "UNWATCH", "MULTI", "EXEC",
+	}
 	args := []any{"COMMAND", "INFO"}
 	for _, name := range names {
 		args = append(args, name)

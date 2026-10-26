@@ -6,19 +6,26 @@ import (
 
 	agentclient "multienv/agent/client/agent"
 	"multienv/agent/internal/filesystem/local"
-	"multienv/common/filesystem/operations"
 )
+
+type DirectoryCandidatesParams struct {
+	Hostname string `json:"hostname"`
+}
+
+type DirectoryCandidatesResult struct {
+	Directories []string `json:"directories"`
+}
 
 func (a Agent) DirectoryCandidates(
 	ctx context.Context,
-	req operations.DirectoryCandidatesRequest,
-) (*operations.DirectoryCandidatesResponse, error) {
+	req DirectoryCandidatesParams,
+) (*DirectoryCandidatesResult, error) {
 	if req.Hostname == "" {
 		return nil, fmt.Errorf("hostname is required")
 	}
 
 	if req.Hostname != a.hostname {
-		response, err := agentclient.InvokeDecode[operations.DirectoryCandidatesResponse](
+		response, err := agentclient.InvokeDecode[DirectoryCandidatesResult](
 			ctx, a.hostClient, req.Hostname, "filesystem", "directory-candidates", req,
 		)
 		if err != nil {
@@ -33,5 +40,5 @@ func (a Agent) DirectoryCandidates(
 		return nil, err
 	}
 
-	return &operations.DirectoryCandidatesResponse{Directories: directories}, nil
+	return &DirectoryCandidatesResult{Directories: directories}, nil
 }

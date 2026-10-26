@@ -40,13 +40,13 @@ func (s *redisStorage) write(
 		return false, fmt.Errorf("invalid JSON value")
 	}
 
-    for _, part := range at.Path {
-        if strings.ContainsAny(part, "\\\"") {
-            return s.writeEscapedPath(ctx, at, value, mode == "NX")
-        }
-    }
+	for _, part := range at.Path {
+		if strings.ContainsAny(part, "\\\"") {
+			return s.writeEscapedPath(ctx, at, value, mode == "NX")
+		}
+	}
 
-    args := []any{mode, string(value)}
+	args := []any{mode, string(value)}
 	for _, part := range at.Path {
 		args = append(args, quoteKey(part), quotePathKey(part))
 	}

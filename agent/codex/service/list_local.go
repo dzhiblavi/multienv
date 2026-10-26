@@ -3,8 +3,8 @@ package service
 import (
 	"context"
 
+	"multienv/agent/codex/model"
 	"multienv/agent/internal/codex/local"
-	"multienv/common/codex/model"
 )
 
 func (a Agent) ListLocal(ctx context.Context) (model.SessionsById, error) {

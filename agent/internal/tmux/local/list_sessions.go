@@ -7,8 +7,8 @@ import (
 	"strings"
 	"time"
 
+	"multienv/agent/tmux/model"
 	"multienv/common/subprocess"
-	"multienv/common/tmux/model"
 )
 
 // Keep the path last so tabs in directory names are preserved by SplitN.

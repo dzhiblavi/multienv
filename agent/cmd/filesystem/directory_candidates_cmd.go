@@ -6,7 +6,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"multienv/common/filesystem/operations"
+	filesystemservice "multienv/agent/filesystem/service"
 )
 
 func newDirectoryCandidatesCmd(app *App) *cobra.Command {
@@ -15,7 +15,7 @@ func newDirectoryCandidatesCmd(app *App) *cobra.Command {
 		Short: "list suggested directories on a local or remote host",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			var req operations.DirectoryCandidatesRequest
+			var req filesystemservice.DirectoryCandidatesParams
 			if err := json.NewDecoder(cmd.InOrStdin()).Decode(&req); err != nil {
 				return fmt.Errorf("failed to decode request: %w", err)
 			}

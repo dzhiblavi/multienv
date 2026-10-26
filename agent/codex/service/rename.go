@@ -7,7 +7,6 @@ import (
 
 	agentclient "multienv/agent/client/agent"
 	"multienv/agent/internal/codex/local"
-	"multienv/common/codex/operations"
 )
 
 type RenameSessionParams struct {
@@ -39,10 +38,7 @@ func (a Agent) renameLocalSession(ctx context.Context, id, newName string) error
 		return fmt.Errorf("get renamed Codex session: %w", err)
 	}
 
-	_, err = a.client.SetSession(ctx, operations.SetSessionRequest{
-		Hostname: a.hostname,
-		Session:  session,
-	})
+	err = a.publishSession(ctx, session)
 	if err != nil {
 		return fmt.Errorf("session renamed, but publishing its snapshot failed: %w", err)
 	}

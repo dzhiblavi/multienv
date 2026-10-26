@@ -3,11 +3,12 @@ package service
 import (
 	"context"
 	"fmt"
+	storagemodel "multienv/common/storage/model"
+	storageops "multienv/common/storage/operations"
 
 	agentclient "multienv/agent/client/agent"
 	"multienv/agent/internal/codex/local"
 	tmux "multienv/agent/internal/tmux/local"
-	"multienv/common/codex/operations"
 	"multienv/common/log"
 )
 
@@ -43,12 +44,8 @@ func (a Agent) deleteLocalSession(ctx context.Context, id string) error {
 		return fmt.Errorf("failed to delete codex session: %v", err)
 	}
 
-	op := operations.DeleteSessionRequest{
-		Hostname:  a.hostname,
-		SessionId: id,
-	}
-
-	_, err = a.client.DeleteSession(ctx, op)
+	at := storagemodel.Location{Key: sessionsKey, Path: []string{a.hostname, id}}
+	_, err = a.storage.Delete(ctx, storageops.DeleteRequest{Location: at})
 	return err
 }
 

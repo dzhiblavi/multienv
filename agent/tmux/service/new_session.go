@@ -6,8 +6,7 @@ import (
 
 	agentclient "multienv/agent/client/agent"
 	"multienv/agent/internal/tmux/local"
-	"multienv/common/tmux/model"
-	"multienv/common/tmux/operations"
+	"multienv/agent/tmux/model"
 )
 
 type NewSessionParams struct {
@@ -30,12 +29,7 @@ func (a Agent) newLocalSession(ctx context.Context, name string) (*model.Session
 		return nil, fmt.Errorf("failed to create a new session: %v", err)
 	}
 
-	op := operations.SetSessionRequest{
-		Hostname: a.hostname,
-		Session:  session,
-	}
-
-	_, err = a.client.SetSession(ctx, op)
+	err = a.publishSession(ctx, session)
 	return &session, err
 }
 
