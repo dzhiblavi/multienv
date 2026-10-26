@@ -125,12 +125,13 @@ func (m *Model) Set(snapshot model.SessionsByHost, cfg config.Config) {
 	})
 	items := make([]browser.Item, 0, len(sessions))
 	for _, s := range sessions {
-		label := display.Clean(s.Data.Name + " · " + cfg.Alias(s.Host))
+		plain := display.Clean(s.Data.Name + " · " + cfg.Alias(s.Host))
+		label := display.Clean(s.Data.Name) + " · " + display.HostAlias(s.Host, cfg.Alias(s.Host))
 		detail := display.Clean(fmt.Sprintf("%d windows · %s · %s",
 			s.Data.WindowCount, s.Data.CurrentCommand, s.Data.CurrentPath))
 		indicator := display.Indicator(s.Data.Attached > 0, s.Data.SyncedAt)
 		items = append(items, browser.Item{ID: s.Key(), Label: indicator + " " + label,
-			Detail: detail, Search: label, AllSearch: label + " " + detail, Value: s})
+			Detail: detail, Search: plain, AllSearch: plain + " " + detail, Value: s})
 	}
 
 	m.Browser.Set(items)

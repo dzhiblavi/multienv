@@ -102,7 +102,7 @@ func (m *model) updateContents() {
 		}
 	}
 
-	m.codex.Preview.SetContent(m.codex.PreviewText())
+	m.codex.Preview.SetContent(m.codex.PreviewText(m.cfg))
 }
 
 func (m *model) scrollPreview(action string) tea.Cmd {

@@ -119,7 +119,8 @@ func (m *Model) visible(session model.Session, cfg config.Config, patterns []*re
 func sessionItem(session model.Session, cfg config.Config) browser.Item {
 	title := sessionTitle(session)
 	state := display.Style(display.Clean(State(session)), stateColor(session.State))
-	label := state + " · " + display.Clean(cfg.Alias(session.Hostname)+" · "+title)
+	host := display.HostAlias(session.Hostname, cfg.Alias(session.Hostname))
+	label := state + " · " + host + " · " + display.Clean(title)
 	detail := display.Clean(session.WorkDir)
 	indicator := display.Indicator(session.TmuxPaneId != "", session.SyncedAt)
 
@@ -168,7 +169,7 @@ func ignorePatterns(path string) ([]*regexp.Regexp, error) {
 	return patterns, nil
 }
 
-func (m *Model) PreviewText() string {
+func (m *Model) PreviewText(cfg config.Config) string {
 	s, ok := m.Selected()
 	if !ok {
 		return "No conversation selected"
@@ -187,7 +188,7 @@ func (m *Model) PreviewText() string {
 		heading(title),
 		display.Style(display.Clean(State(s)), stateColor(s.State)),
 		"",
-		display.Style("Host       ", "8") + display.Clean(s.Hostname),
+		display.Style("Host       ", "8") + display.HostAlias(s.Hostname, cfg.Alias(s.Hostname)),
 		display.Style("Directory  ", "8") + display.Clean(s.WorkDir),
 		display.Style("Pane       ", "8") + display.Clean(s.TmuxPaneId),
 		display.Style("Synced     ", "8") + display.Age(s.SyncedAt),

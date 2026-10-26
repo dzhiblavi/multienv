@@ -153,7 +153,7 @@ func (m *model) createTmux() tea.Cmd {
 	hosts = slices.Compact(hosts)
 	items := make([]browser.Item, 0, len(hosts))
 	for _, host := range hosts {
-		items = append(items, browser.Item{ID: host, Label: display.Clean(m.cfg.Alias(host)),
+		items = append(items, browser.Item{ID: host, Label: display.HostAlias(host, m.cfg.Alias(host)),
 			Detail: display.Clean(host), Search: host + " " + m.cfg.Alias(host), Value: host})
 	}
 
