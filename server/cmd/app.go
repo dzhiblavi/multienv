@@ -2,32 +2,27 @@ package main
 
 import (
 	"fmt"
+	"io"
 
 	"github.com/spf13/cobra"
 
 	"multienv/common/util"
-	"multienv/server/internal/codex"
 	"multienv/server/internal/doctor"
 	"multienv/server/internal/host"
 	"multienv/server/internal/httpserver"
 	"multienv/server/internal/master"
 	"multienv/server/internal/storage"
 	redisstorage "multienv/server/internal/storage/redis"
-	"multienv/server/internal/tmux"
 )
 
 type App struct {
-	server       httpserver.Server
-	tmuxStorage  storage.Storage
-	codexStorage storage.Storage
+	server  httpserver.Server
+	storage io.Closer
 }
 
 func (a App) Close() {
-	if a.tmuxStorage != nil {
-		a.tmuxStorage.Close()
-	}
-	if a.codexStorage != nil {
-		a.codexStorage.Close()
+	if a.storage != nil {
+		a.storage.Close()
 	}
 }
 
@@ -53,53 +48,33 @@ func newRootCmd() *cobra.Command {
 				return fmt.Errorf("failed to parse config: %v", err)
 			}
 
-			tmuxStorage, err := redisstorage.New(ctx, config.Storage, "@tmux")
+			data, err := redisstorage.New(ctx, config.Storage)
 			if err != nil {
-				return fmt.Errorf("create tmux storage: %w", err)
+				return fmt.Errorf("create storage: %w", err)
 			}
-			app.tmuxStorage = tmuxStorage
-			if err := tmuxStorage.Init(ctx); err != nil {
-				app.Close()
-				return fmt.Errorf("initialize tmux storage: %w", err)
-			}
-			hostDispatcher := host.New()
-			tmuxDispatcher := tmux.New(config.Tmux, tmuxStorage, hostDispatcher)
 
-			codexStorage, err := redisstorage.New(ctx, config.Storage, "@codex")
+			app.storage = data
+			hostDispatcher, err := host.New(config.Hosts)
 			if err != nil {
 				app.Close()
-				return fmt.Errorf("create codex storage: %w", err)
+				return fmt.Errorf("configure hosts: %w", err)
 			}
-			app.codexStorage = codexStorage
-			if err := codexStorage.Init(ctx); err != nil {
-				app.Close()
-				return fmt.Errorf("initialize codex storage: %w", err)
-			}
-			codexDispatcher := codex.New(config.Codex, codexStorage, hostDispatcher)
 
-			hosts := append(append([]string{}, config.Tmux.Hosts...), config.Codex.Hosts...)
-			diagnostics, err := doctor.New(hosts, map[string]doctor.SnapshotReader{
-				"tmux": tmuxStorage, "codex": codexStorage,
-			}, doctor.AgentRunner{})
+			diagnostics, err := doctor.New(hostDispatcher.Hostnames(), data, doctor.AgentRunner{})
 			if err != nil {
 				app.Close()
 				return fmt.Errorf("create doctor: %w", err)
 			}
 
 			app.server = httpserver.New(config.Server)
+			if err := app.server.Install("storage", storage.NewDispatcher(data)); err != nil {
+				app.Close()
+				return fmt.Errorf("install storage dispatcher: %w", err)
+			}
+
 			if err := app.server.Install("doctor", doctor.NewDispatcher(diagnostics)); err != nil {
 				app.Close()
 				return fmt.Errorf("install doctor: %w", err)
-			}
-
-			if err := app.server.Install("tmux", tmuxDispatcher); err != nil {
-				app.Close()
-				return fmt.Errorf("install tmux dispatcher: %w", err)
-			}
-
-			if err := app.server.Install("codex", codexDispatcher); err != nil {
-				app.Close()
-				return fmt.Errorf("install codex dispatcher: %w", err)
 			}
 
 			if err := app.server.Install("master", master.New()); err != nil {

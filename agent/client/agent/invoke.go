@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"multienv/agent/host/client"
+	"multienv/common/host/model"
 	"multienv/common/host/operations"
 	"multienv/common/subprocess"
 )
@@ -32,7 +33,11 @@ func Invoke(
 		return nil, fmt.Errorf("invoke agent: %w", err)
 	}
 
-	if len(response.Results) != 1 || response.Results[0].Hostname != hostname {
+	if len(response.Results) != 1 {
+		return nil, fmt.Errorf("invalid agent invocation response for %s", hostname)
+	}
+
+	if hostname != model.Master && response.Results[0].Hostname != hostname {
 		return nil, fmt.Errorf("invalid agent invocation response for %s", hostname)
 	}
 

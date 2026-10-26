@@ -2,8 +2,6 @@ package redis
 
 import (
 	"context"
-	"encoding/json"
-	"errors"
 	"fmt"
 
 	redis "github.com/redis/go-redis/v9"
@@ -14,18 +12,16 @@ import (
 
 type redisStorage struct {
 	client redis.UniversalClient
-	key    string
 }
 
 var _ storage.Storage = (*redisStorage)(nil)
 
-func New(ctx context.Context, config Config, key string) (*redisStorage, error) {
+func New(ctx context.Context, config Config) (*redisStorage, error) {
 	if config.CredentialsPath == "" {
-		return nil, fmt.Errorf("CredentialsPath is required")
+		return nil, fmt.Errorf("credentials_path is required")
 	}
 
-	err := util.ReadYaml(ctx, config.CredentialsPath, &config.credentials)
-	if err != nil {
+	if err := util.ReadYaml(ctx, config.CredentialsPath, &config.credentials); err != nil {
 		return nil, err
 	}
 
@@ -35,82 +31,15 @@ func New(ctx context.Context, config Config, key string) (*redisStorage, error) 
 		Password: config.credentials.Password,
 		DB:       config.DB,
 	})
+	store := &redisStorage{client: client}
+	if err := store.Check(ctx); err != nil {
+		client.Close()
+		return nil, err
+	}
 
-	return &redisStorage{client: client, key: key}, nil
+	return store, nil
 }
 
-func (s redisStorage) Close() {
-	s.client.Close()
-}
-
-func (s *redisStorage) Init(ctx context.Context) error {
-	return s.SetIfAbsent(ctx, "$", map[string]any{})
-}
-
-// Get decodes the JSON.GET response into dst, which must be a non-nil pointer.
-// Paths use RedisJSON syntax: "." reads the document, ".field" reads one value,
-// and "$" or "$.field" returns an array of matching values.
-func (s *redisStorage) Get(ctx context.Context, path string, dst any) error {
-	repr, err := s.client.JSONGet(ctx, s.key, path).Result()
-	if err != nil {
-		return fmt.Errorf("redis JSONGet failed: %v", err)
-	}
-
-	if repr == "" {
-		// Not found
-		return nil
-	}
-
-	err = json.Unmarshal([]byte(repr), dst)
-	if err != nil {
-		return fmt.Errorf("redis response unmarshal failed: %v", err)
-	}
-
-	return nil
-}
-
-func (s *redisStorage) Set(ctx context.Context, path string, value any) error {
-	return s.set(ctx, path, value, "")
-}
-
-func (s *redisStorage) SetIfAbsent(ctx context.Context, path string, value any) error {
-	err := s.set(ctx, path, value, "NX")
-	if errors.Is(err, redis.Nil) {
-		return nil
-	}
-
-	return err
-}
-
-func (s *redisStorage) set(ctx context.Context, path string, value any, mode string) error {
-	repr, err := json.Marshal(value)
-	if err != nil {
-		return err
-	}
-
-	if path == "$" || path == "." {
-		return s.client.JSONSetMode(ctx, s.key, path, repr, mode).Err()
-	}
-
-	var result *redis.StatusCmd
-	_, err = s.client.TxPipelined(ctx, func(pipe redis.Pipeliner) error {
-		pipe.JSONSetMode(ctx, s.key, "$", "{}", "NX")
-		result = pipe.JSONSetMode(ctx, s.key, path, repr, mode)
-		return nil
-	})
-	if err != nil && !errors.Is(err, redis.Nil) {
-		return err
-	}
-
-	return result.Err()
-}
-
-func (s *redisStorage) Delete(ctx context.Context, path string) error {
-	res := s.client.JSONDel(ctx, s.key, path)
-
-	if res.Err() != nil {
-		return res.Err()
-	}
-
-	return nil
+func (s redisStorage) Close() error {
+	return s.client.Close()
 }

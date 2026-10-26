@@ -3,10 +3,26 @@ package service
 import (
 	"context"
 
-	"multienv/common/codex/operations"
+	"multienv/common/host/model"
+	"multienv/common/host/operations"
+	"multienv/common/log"
+	"multienv/common/subprocess"
 )
 
 func (a Agent) SyncAll(ctx context.Context) error {
-	_, err := a.client.SyncAllSessions(ctx, operations.SyncAllSessionsRequest{})
-	return err
+	response, err := a.hostClient.Invoke(ctx, operations.InvokeRequest{
+		Hostnames: []string{model.All},
+		Command:   subprocess.Command{Name: "multienv-agent", Args: []string{"codex", "sync-local"}},
+	})
+	if err != nil {
+		return err
+	}
+
+	for _, result := range response.Results {
+		if err := result.Err(); err != nil {
+			log.Error(ctx, "failed to sync host", "host", result.Hostname, "error", err)
+		}
+	}
+
+	return nil
 }

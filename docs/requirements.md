@@ -35,8 +35,10 @@ and any tools used by enabled integrations.
 
 ## Redis
 
-Redis must support `JSON.GET`, `JSON.SET`, `JSON.DEL` and transactions.
-The configured account needs read/write access to `@tmux` and `@codex` in the selected database.
+Redis must support `JSON.GET`, `JSON.SET`, `JSON.DEL`, `JSON.TYPE`, `EVAL` and `EVALSHA`.
+The account also needs `PING` and `COMMAND INFO` for connection and capability checks,
+and read/write access to the JSON documents used by integrations.
+The built-in integrations use `@tmux` and `@codex`.
 Set the endpoint, database and credentials file in [server configuration](server.md#configuration).
 See [Redis](redis.md) for an example instance and a JSON capability check.
 

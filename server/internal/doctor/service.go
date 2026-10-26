@@ -2,7 +2,6 @@ package doctor
 
 import (
 	"context"
-	"fmt"
 	"os"
 	"sort"
 	"sync"
@@ -12,8 +11,8 @@ import (
 	"multienv/common/doctor/model"
 )
 
-type SnapshotReader interface {
-	Get(context.Context, string, any) error
+type StorageChecker interface {
+	Check(context.Context) error
 }
 
 type HostRunner interface {
@@ -22,12 +21,12 @@ type HostRunner interface {
 
 type Service struct {
 	hosts    []string
-	stores   map[string]SnapshotReader
+	storage  StorageChecker
 	runner   HostRunner
 	hostname string
 }
 
-func New(hosts []string, stores map[string]SnapshotReader, runner HostRunner) (*Service, error) {
+func New(hosts []string, storage StorageChecker, runner HostRunner) (*Service, error) {
 	hostname, err := os.Hostname()
 	if err != nil {
 		return nil, err
@@ -45,7 +44,7 @@ func New(hosts []string, stores map[string]SnapshotReader, runner HostRunner) (*
 	}
 	sort.Strings(ordered)
 
-	return &Service{hosts: ordered, stores: stores, runner: runner, hostname: hostname}, nil
+	return &Service{hosts: ordered, storage: storage, runner: runner, hostname: hostname}, nil
 }
 
 func (s *Service) Diagnose(ctx context.Context) model.Report {
@@ -79,33 +78,14 @@ func (s *Service) Diagnose(ctx context.Context) model.Report {
 }
 
 func (s *Service) checkStorage(ctx context.Context) model.HostReport {
-	host := model.HostReport{Hostname: s.hostname, Source: "server", Checks: []model.Check{}}
-	names := make([]string, 0, len(s.stores))
-	for name := range s.stores {
-		names = append(names, name)
-	}
-	sort.Strings(names)
-	for _, name := range names {
-		check := checks.Measure(ctx, "redis."+name, "storage", func(ctx context.Context) (string, error) {
-			ctx, cancel := context.WithTimeout(ctx, 3*time.Second)
-			defer cancel()
+	check := checks.Measure(ctx, "redis", "storage", func(ctx context.Context) (string, error) {
+		ctx, cancel := context.WithTimeout(ctx, 3*time.Second)
+		defer cancel()
 
-			var snapshot map[string]any
-			if err := s.stores[name].Get(ctx, ".", &snapshot); err != nil {
-				return "", err
-			}
+		return "Redis JSON commands and scripting available", s.storage.Check(ctx)
+	})
 
-			if snapshot == nil {
-				return "", fmt.Errorf("%s snapshot document is missing", name)
-			}
-
-			return "Redis JSON snapshot readable", nil
-		})
-
-		host.Checks = append(host.Checks, check)
-	}
-
-	return host
+	return model.HostReport{Hostname: s.hostname, Source: "server", Checks: []model.Check{check}}
 }
 
 func (s *Service) checkHost(ctx context.Context, hostname string) []model.HostReport {

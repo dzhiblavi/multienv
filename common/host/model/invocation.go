@@ -7,6 +7,7 @@ import (
 )
 
 const Master = "@master"
+const All = "@all"
 
 type Invocation struct {
 	subprocess.RunResult

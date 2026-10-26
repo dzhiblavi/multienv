@@ -5,12 +5,12 @@ flowchart LR
     TUI["TUI on any host"] -->|HTTP over SSH tunnels| Server["Server on master"]
     Server -->|Commands| Agents["Agents on managed hosts"]
     Agents -->|"State snapshots"| Server
-    Server --> Redis["Redis snapshots"]
+    Server --> Redis["JSON documents in Redis"]
     TUI -->|Switch request| Launcher["Workstation launcher"]
     Launcher -->|Local attach or SSH| Sessions["tmux sessions"]
 ```
 
-The **server** keeps a shared view of sessions in Redis and dispatches operations
+The **server** provides shared JSON storage in Redis and dispatches commands
 to the appropriate host. It runs commands directly on its own host and uses SSH
 to invoke the agent elsewhere. Desktop actions run on the server's machine.
 

@@ -3,7 +3,6 @@ package host
 import (
 	"context"
 	"fmt"
-	"os"
 	"strings"
 	"sync"
 	"time"
@@ -28,15 +27,15 @@ func (d Dispatcher) Invoke(ctx context.Context, req operations.InvokeRequest) (*
 		return nil, fmt.Errorf("%w: %w", dispatcher.ErrInvalidParams, err)
 	}
 
-	master, err := os.Hostname()
+	hostnames, err := d.resolveHostnames(req.Hostnames)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("%w: %w", dispatcher.ErrInvalidParams, err)
 	}
 
-	response := &operations.InvokeResponse{Results: make([]model.Invocation, len(req.Hostnames))}
+	response := &operations.InvokeResponse{Results: make([]model.Invocation, len(hostnames))}
 	slots := make(chan struct{}, maxParallelInvocations)
 	var wg sync.WaitGroup
-	for i, hostname := range req.Hostnames {
+	for i, hostname := range hostnames {
 		wg.Go(func() {
 			select {
 			case slots <- struct{}{}:
@@ -48,7 +47,7 @@ func (d Dispatcher) Invoke(ctx context.Context, req operations.InvokeRequest) (*
 				return
 			}
 
-			response.Results[i] = invokeHost(ctx, req, hostname, master, timeout)
+			response.Results[i] = invokeHost(ctx, req, hostname, timeout)
 		})
 	}
 
@@ -92,20 +91,15 @@ func parseInvokeTimeout(value string) (time.Duration, error) {
 func invokeHost(
 	ctx context.Context,
 	req operations.InvokeRequest,
-	hostname, master string,
+	hostname string,
 	timeout time.Duration,
 ) model.Invocation {
 	ctx = log.WithCustomLogData(ctx, "host", hostname)
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
-	target := hostname
-	if target == model.Master {
-		target = master
-	}
-
 	result, err := subprocess.RunRemote(ctx, subprocess.RemoteCommand{
-		Hostname: target,
+		Hostname: hostname,
 		Command:  req.Command,
 	})
 	response := model.Invocation{Hostname: hostname, RunResult: result}

@@ -33,7 +33,8 @@ commands without a result produce no stdout output.
 
 ## Invoke
 
-Run a command on a list of hosts; `@master` selects the server host:
+Run a command on a list of hosts; `@master` selects the server host and `@all`
+selects the shared host list from [server configuration](server.md#configuration):
 
 ```sh
 printf '%s\n' '{"hostnames":["@master","devbox"],"command":"hostname"}' | multienv-agent invoke
@@ -43,7 +44,8 @@ The request accepts `command`, an optional `args` array, optional `stdin` text a
 per-host `timeout` such as `10s` (default `30s`). Commands run directly; invoke a shell explicitly
 when needed. The agent's `client.timeout` still limits the entire HTTP request.
 
-The JSON response contains `results`, one per host in request order, with `hostname`, `stdout`,
+Aliases expand to actual hostnames; duplicate targets run once. Results follow the expanded host order.
+The JSON response contains `results`, one per host, with `hostname`, `stdout`,
 `stderr`, `exit_code` and an optional `error` for execution failures. Hosts run in parallel;
 one host's failure does not discard other results. The CLI prints the response and returns
 a nonzero exit status if any host fails.
@@ -64,7 +66,7 @@ Both `tmux` and `codex` provide:
 | `list-local` | Read this host's sessions, keyed by session ID; no server request |
 | `list-all` | Combine server snapshots with a fresh local snapshot, grouped by hostname and ID |
 | `sync-local` | Publish this host's snapshot to the server |
-| `sync-all` | Ask the server to collect snapshots from the configured hosts |
+| `sync-all` | Invoke `sync-local` on all configured hosts through `@all` |
 
 ```sh
 multienv-agent tmux list-all | jq
@@ -73,7 +75,8 @@ multienv-agent tmux sync-all
 ```
 
 `list-all` falls back to local sessions if the server cannot be reached. `sync-all`
-can complete while individual hosts fail; check server logs and snapshot ages.
+can complete while individual hosts fail; check the command's stderr and snapshot ages.
+Snapshots are read and published through [JSON storage](storage.md), under `@tmux` and `@codex`.
 
 ## Tmux operations
 

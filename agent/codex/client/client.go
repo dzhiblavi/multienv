@@ -25,9 +25,4 @@ type Client interface {
 		ctx context.Context,
 		op operations.DeleteSessionRequest,
 	) (*operations.DeleteSessionResponse, error)
-
-	SyncAllSessions(
-		ctx context.Context,
-		op operations.SyncAllSessionsRequest,
-	) (*operations.SyncAllSessionsResponse, error)
 }

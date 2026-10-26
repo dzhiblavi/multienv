@@ -1,6 +1,6 @@
 # Server
 
-The server stores host snapshots in Redis, coordinates synchronization, forwards agent commands
+The server manages hosts, executes commands, provides JSON storage
 and performs desktop actions on the master. Run one instance for the workspace.
 See [requirements](requirements.md) and [architecture](architecture.md).
 
@@ -13,13 +13,9 @@ server:
   address: 127.0.0.1
   port: 12401
 
-tmux:
-  hosts:
-    - macbook
-    - devbox
-
-codex:
-  hosts: []
+hosts:
+  - macbook
+  - devbox
 
 storage:
   address: 127.0.0.1
@@ -28,12 +24,12 @@ storage:
   credentials_path: ~/.config/multienv/redis-credentials.yaml
 ```
 
-Use actual hostnames in the host lists; the server also uses these names for SSH.
+Use actual hostnames in `hosts`; the server also uses these names for SSH.
+`@master` can represent the server host in this list. If omitted, `hosts` defaults to the server's own hostname.
+The `@all` invocation alias selects these hosts; duplicate targets are executed once.
 It invokes `multienv-agent` from PATH on remote hosts.
 Generic command execution uses `POST /host` with action `invoke`; see [agent invoke](agent.md#invoke).
-`tmux.hosts` and `codex.hosts` select the machines collected for each domain.
-Set `codex.hosts` to an empty list to disable Codex collection; add its hosts to enable it.
-If omitted, both host lists default to the server's own hostname.
+JSON storage uses `POST /storage`; see [storage operations](storage.md).
 
 The HTTP endpoint defaults to `127.0.0.1:12123`; this example explicitly uses `12401`.
 The API has no authentication. Bind it to loopback and use [SSH tunnels](forwarder.md) for other hosts.

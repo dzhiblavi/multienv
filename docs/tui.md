@@ -121,15 +121,7 @@ directories from zoxide when it is installed on that host. Esc cancels creation.
 
 ## Optional Codex integration
 
-To collect Codex conversations, add their hosts to `codex.hosts` in the server
-configuration and restart the server. For example:
-
-```yaml
-codex:
-  hosts:
-    - macbook
-    - devbox
-```
+Codex uses the shared host list from [server configuration](server.md#configuration).
 
 Install the [Codex dependencies](requirements.md#optional-tools) on those hosts. The integration uses the same
 agent, SSH connections and tmux sessions as the main workspace. Press Ctrl-B in the

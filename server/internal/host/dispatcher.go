@@ -10,10 +10,9 @@ import (
 	"multienv/server/internal/dispatcher"
 )
 
-type Dispatcher struct{}
-
-func New() Dispatcher {
-	return Dispatcher{}
+type Dispatcher struct {
+	hosts  []string
+	master string
 }
 
 func (d Dispatcher) Dispatch(ctx context.Context, payload string) (any, error) {
