@@ -101,6 +101,7 @@ func invokeHost(
 	result, err := subprocess.RunRemote(ctx, subprocess.RemoteCommand{
 		Hostname: hostname,
 		Command:  req.Command,
+		Compress: req.Compress,
 	})
 	response := model.Invocation{Hostname: hostname, RunResult: result}
 	if ctx.Err() != nil {

@@ -33,6 +33,10 @@ func RunRemote(ctx context.Context, command RemoteCommand) (RunResult, error) {
 		},
 	}
 
+	if command.Compress {
+		cmd.Args = append([]string{"-C"}, cmd.Args...)
+	}
+
 	return Run(ctx, cmd)
 }
 

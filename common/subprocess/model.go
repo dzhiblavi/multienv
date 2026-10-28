@@ -9,6 +9,7 @@ type Command struct {
 type RemoteCommand struct {
 	Command
 	Hostname string
+	Compress bool
 }
 
 type RunResult struct {

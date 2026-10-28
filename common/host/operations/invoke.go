@@ -12,6 +12,7 @@ type InvokeRequest struct {
 
 	Hostnames []string `json:"hostnames"`
 	Timeout   string   `json:"timeout,omitempty"`
+	Compress  bool     `json:"compress,omitempty"`
 }
 
 type InvokeResponse struct {
