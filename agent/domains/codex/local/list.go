@@ -305,7 +305,7 @@ func getTtyToTmuxPaneMapping(ctx context.Context) (map[string]tmuxPane, error) {
 func getCodexFilesInfo(ctx context.Context) ([]codexFilesInfo, error) {
 	cmd := subprocess.Command{
 		Name: "lsof",
-		Args: []string{"-nP", "-c", "codex", "-F", "0pcfn"},
+		Args: []string{"-w", "-nP", "-c", "codex", "-F", "0pcfn"},
 	}
 
 	lsofResult, err := subprocess.Run(ctx, cmd)

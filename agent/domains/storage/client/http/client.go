@@ -20,7 +20,7 @@ func (c httpClient) Get(
 	req operations.GetRequest,
 ) (*operations.GetResponse, error) {
 	var response operations.GetResponse
-	if err := c.client.Post(ctx, "storage", "get", req, &response); err != nil {
+	if err := c.client.Post(ctx, "storage", "get", req, &response, false); err != nil {
 		return nil, err
 	}
 
@@ -32,7 +32,7 @@ func (c httpClient) Set(
 	req operations.SetRequest,
 ) (*operations.SetResponse, error) {
 	var response operations.SetResponse
-	if err := c.client.Post(ctx, "storage", "set", req, &response); err != nil {
+	if err := c.client.Post(ctx, "storage", "set", req, &response, false); err != nil {
 		return nil, err
 	}
 
@@ -44,7 +44,7 @@ func (c httpClient) SetIfAbsent(
 	req operations.SetIfAbsentRequest,
 ) (*operations.SetIfAbsentResponse, error) {
 	var response operations.SetIfAbsentResponse
-	if err := c.client.Post(ctx, "storage", "set-if-absent", req, &response); err != nil {
+	if err := c.client.Post(ctx, "storage", "set-if-absent", req, &response, false); err != nil {
 		return nil, err
 	}
 
@@ -56,7 +56,7 @@ func (c httpClient) Delete(
 	req operations.DeleteRequest,
 ) (*operations.DeleteResponse, error) {
 	var response operations.DeleteResponse
-	if err := c.client.Post(ctx, "storage", "delete", req, &response); err != nil {
+	if err := c.client.Post(ctx, "storage", "delete", req, &response, false); err != nil {
 		return nil, err
 	}
 

@@ -17,7 +17,7 @@ func New(config transport.Config) httpClient {
 
 func (c httpClient) Invoke(ctx context.Context, req operations.InvokeRequest) (*operations.InvokeResponse, error) {
 	var response operations.InvokeResponse
-	if err := c.client.Post(ctx, "host", "invoke", req, &response); err != nil {
+	if err := c.client.Post(ctx, "host", "invoke", req, &response, req.Compress); err != nil {
 		return nil, err
 	}
 

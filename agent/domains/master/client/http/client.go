@@ -20,7 +20,7 @@ func (c httpClient) Open(
 	req operations.OpenRequest,
 ) (*operations.OpenResponse, error) {
 	var resp operations.OpenResponse
-	if err := c.client.Post(ctx, "master", "open", req, &resp); err != nil {
+	if err := c.client.Post(ctx, "master", "open", req, &resp, false); err != nil {
 		return nil, err
 	}
 	return &resp, nil
@@ -32,7 +32,7 @@ func (c httpClient) ShowNotification(
 ) (*operations.ShowNotificationResponse, error) {
 	var resp operations.ShowNotificationResponse
 
-	if err := c.client.Post(ctx, "master", "show-notification", req, &resp); err != nil {
+	if err := c.client.Post(ctx, "master", "show-notification", req, &resp, false); err != nil {
 		return nil, err
 	}
 

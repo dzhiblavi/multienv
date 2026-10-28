@@ -26,7 +26,7 @@ func (c httpClient) Ping(ctx context.Context, req operations.PingRequest) (*oper
 	defer cancel()
 
 	var response operations.PingResponse
-	if err := c.client.Post(ctx, "doctor", "ping", req, &response); err != nil {
+	if err := c.client.Post(ctx, "doctor", "ping", req, &response, false); err != nil {
 		return nil, err
 	}
 
@@ -39,7 +39,7 @@ func (c httpClient) Ping(ctx context.Context, req operations.PingRequest) (*oper
 
 func (c httpClient) Global(ctx context.Context, req operations.GlobalRequest) (*operations.GlobalResponse, error) {
 	var response operations.GlobalResponse
-	if err := c.client.Post(ctx, "doctor", "global", req, &response); err != nil {
+	if err := c.client.Post(ctx, "doctor", "global", req, &response, false); err != nil {
 		return nil, err
 	}
 

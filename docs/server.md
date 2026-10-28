@@ -31,6 +31,8 @@ The caller supplies the command, arguments and stdin. The server runs the comman
 without interpreting integration-specific operations or data.
 Generic command execution uses `POST /host` with action `invoke`; see [agent host commands](agent.md#host-commands).
 JSON storage uses `POST /storage`; see [storage operations](storage.md).
+The API accepts gzip request bodies with `Content-Encoding: gzip` and returns gzip responses
+when requested through `Accept-Encoding: gzip`.
 
 The HTTP endpoint defaults to `127.0.0.1:12123`; this example explicitly uses `12401`.
 The API has no authentication. Bind it to loopback and use [SSH tunnels](forwarder.md) for other hosts.

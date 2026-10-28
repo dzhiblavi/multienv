@@ -46,7 +46,8 @@ printf '%s\n' '{"hostnames":["@master","devbox"],"command":"hostname"}' | multie
 The request accepts `command`, an optional `args` array, optional `stdin` text and an optional
 per-host `timeout` such as `10s` (default `30s`). Commands run directly; invoke a shell explicitly
 when needed. The agent's `client.timeout` still limits the entire HTTP request.
-Set `compress` to `true` to enable SSH compression when the server runs the command on a remote host.
+Set `compress` to `true` to gzip the HTTP request and response and enable SSH compression for remote commands.
+CLI input and output remain plain JSON.
 
 Aliases expand to actual hostnames; duplicate targets run once. Results follow the expanded host order.
 The JSON response contains `results`, one per host, with `hostname`, `stdout`,

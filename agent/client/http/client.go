@@ -2,6 +2,7 @@ package http
 
 import (
 	"bytes"
+	"compress/gzip"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -24,6 +25,7 @@ func (c Client) Post(
 	ctx context.Context,
 	domain, action string,
 	req, dst any,
+	compress bool,
 ) error {
 	request, err := json.Marshal(req)
 	if err != nil {
@@ -41,7 +43,14 @@ func (c Client) Post(
 		return err
 	}
 
-	return c.send(ctx, "/"+domain, bytes.NewReader(body), dst)
+	if compress {
+		body, err = compressBody(body)
+		if err != nil {
+			return fmt.Errorf("compress request: %w", err)
+		}
+	}
+
+	return c.send(ctx, "/"+domain, bytes.NewReader(body), dst, compress)
 }
 
 func (c Client) send(
@@ -49,6 +58,7 @@ func (c Client) send(
 	path string,
 	body io.Reader,
 	dst any,
+	compress bool,
 ) error {
 	endpoint, err := url.Parse(c.config.URL)
 	if err != nil || endpoint.Host == "" || (endpoint.Scheme != "http" && endpoint.Scheme != "https") {
@@ -63,6 +73,11 @@ func (c Client) send(
 
 	req.Header.Set("Accept", "application/json")
 	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Accept-Encoding", "identity")
+	if compress {
+		req.Header.Set("Content-Encoding", "gzip")
+		req.Header.Set("Accept-Encoding", "gzip")
+	}
 
 	resp, err := c.client.Do(req)
 	if err != nil {
@@ -70,7 +85,21 @@ func (c Client) send(
 	}
 	defer resp.Body.Close()
 
-	data, err := io.ReadAll(resp.Body)
+	var responseBody io.Reader = resp.Body
+	switch encoding := strings.ToLower(strings.TrimSpace(resp.Header.Get("Content-Encoding"))); encoding {
+	case "", "identity":
+	case "gzip":
+		reader, err := gzip.NewReader(resp.Body)
+		if err != nil {
+			return fmt.Errorf("decode gzip response: %w", err)
+		}
+		defer reader.Close()
+		responseBody = reader
+	default:
+		return fmt.Errorf("unsupported response Content-Encoding %q", encoding)
+	}
+
+	data, err := io.ReadAll(responseBody)
 	if err != nil {
 		return fmt.Errorf("read response: %w", err)
 	}
@@ -84,4 +113,17 @@ func (c Client) send(
 	}
 
 	return nil
+}
+
+func compressBody(body []byte) ([]byte, error) {
+	var compressed bytes.Buffer
+	writer := gzip.NewWriter(&compressed)
+	if _, err := writer.Write(body); err != nil {
+		return nil, err
+	}
+	if err := writer.Close(); err != nil {
+		return nil, err
+	}
+
+	return compressed.Bytes(), nil
 }
